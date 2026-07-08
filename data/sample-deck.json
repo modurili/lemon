@@ -1,0 +1,29 @@
+{
+  "deck": {
+    "id": "sample-basic-1",
+    "name": "サンプル基礎単語",
+    "description": "動作確認用のサンプル単語帳"
+  },
+  "words": [
+    { "id": "w001", "headword": "abandon", "pos": "動詞", "meaning": "捨てる、放棄する", "example": "He abandoned the plan.", "exampleTranslation": "彼はその計画を放棄した。", "phonetic": "/əˈbændən/", "cefr": "B1" },
+    { "id": "w002", "headword": "achieve", "pos": "動詞", "meaning": "達成する", "example": "She achieved her goal.", "exampleTranslation": "彼女は目標を達成した。", "phonetic": "/əˈtʃiːv/", "cefr": "A2" },
+    { "id": "w003", "headword": "benefit", "pos": "名詞/動詞", "meaning": "利益、恩恵を受ける", "example": "This will benefit everyone.", "exampleTranslation": "これは皆の利益になる。", "phonetic": "/ˈbenɪfɪt/", "cefr": "A2" },
+    { "id": "w004", "headword": "circumstance", "pos": "名詞", "meaning": "状況、事情", "example": "Under normal circumstances, this works fine.", "exampleTranslation": "通常の状況では、これはうまく機能する。", "phonetic": "/ˈsɜːrkəmstæns/", "cefr": "B1" },
+    { "id": "w005", "headword": "deny", "pos": "動詞", "meaning": "否定する", "example": "He denied the accusation.", "exampleTranslation": "彼はその告発を否定した。", "phonetic": "/dɪˈnaɪ/", "cefr": "A2" },
+    { "id": "w006", "headword": "efficient", "pos": "形容詞", "meaning": "効率的な", "example": "This is a more efficient method.", "exampleTranslation": "これはより効率的な方法だ。", "phonetic": "/ɪˈfɪʃnt/", "cefr": "B1" },
+    { "id": "w007", "headword": "fundamental", "pos": "形容詞", "meaning": "基本的な、根本的な", "example": "This is a fundamental principle.", "exampleTranslation": "これは基本的な原則だ。", "phonetic": "/ˌfʌndəˈmentl/", "cefr": "B2" },
+    { "id": "w008", "headword": "generate", "pos": "動詞", "meaning": "生み出す、発生させる", "example": "The process generates heat.", "exampleTranslation": "そのプロセスは熱を発生させる。", "phonetic": "/ˈdʒenəreɪt/", "cefr": "B1" },
+    { "id": "w009", "headword": "hesitate", "pos": "動詞", "meaning": "ためらう", "example": "Don't hesitate to ask.", "exampleTranslation": "遠慮なく聞いてください。", "phonetic": "/ˈhezɪteɪt/", "cefr": "B1" },
+    { "id": "w010", "headword": "identify", "pos": "動詞", "meaning": "特定する、識別する", "example": "We need to identify the problem.", "exampleTranslation": "私たちは問題を特定する必要がある。", "phonetic": "/aɪˈdentɪfaɪ/", "cefr": "A2" },
+    { "id": "w011", "headword": "justify", "pos": "動詞", "meaning": "正当化する", "example": "You can't justify that decision.", "exampleTranslation": "その決定を正当化することはできない。", "phonetic": "/ˈdʒʌstɪfaɪ/", "cefr": "B2" },
+    { "id": "w012", "headword": "knowledge", "pos": "名詞", "meaning": "知識", "example": "He has extensive knowledge of history.", "exampleTranslation": "彼は歴史に関する広範な知識を持っている。", "phonetic": "/ˈnɒlɪdʒ/", "cefr": "A2" },
+    { "id": "w013", "headword": "legitimate", "pos": "形容詞", "meaning": "正当な、合法的な", "example": "That is a legitimate concern.", "exampleTranslation": "それは正当な懸念だ。", "phonetic": "/lɪˈdʒɪtɪmət/", "cefr": "C1" },
+    { "id": "w014", "headword": "maintain", "pos": "動詞", "meaning": "維持する", "example": "It's hard to maintain focus.", "exampleTranslation": "集中を維持するのは難しい。", "phonetic": "/meɪnˈteɪn/", "cefr": "B1" },
+    { "id": "w015", "headword": "negotiate", "pos": "動詞", "meaning": "交渉する", "example": "They negotiated a new contract.", "exampleTranslation": "彼らは新しい契約を交渉した。", "phonetic": "/nɪˈɡoʊʃieɪt/", "cefr": "B2" },
+    { "id": "w016", "headword": "obvious", "pos": "形容詞", "meaning": "明白な", "example": "It's obvious that he was lying.", "exampleTranslation": "彼が嘘をついていたのは明白だ。", "phonetic": "/ˈɒbviəs/", "cefr": "A2" },
+    { "id": "w017", "headword": "perceive", "pos": "動詞", "meaning": "知覚する、認識する", "example": "People perceive risk differently.", "exampleTranslation": "人々はリスクを異なって認識する。", "phonetic": "/pərˈsiːv/", "cefr": "B2" },
+    { "id": "w018", "headword": "reluctant", "pos": "形容詞", "meaning": "気が進まない", "example": "She was reluctant to leave.", "exampleTranslation": "彼女は立ち去るのに気が進まなかった。", "phonetic": "/rɪˈlʌktənt/", "cefr": "B2" },
+    { "id": "w019", "headword": "sufficient", "pos": "形容詞", "meaning": "十分な", "example": "This amount is sufficient.", "exampleTranslation": "この量で十分だ。", "phonetic": "/səˈfɪʃnt/", "cefr": "B1" },
+    { "id": "w020", "headword": "tremendous", "pos": "形容詞", "meaning": "巨大な、すごい", "example": "It was a tremendous success.", "exampleTranslation": "それは大成功だった。", "phonetic": "/trəˈmendəs/", "cefr": "B2" }
+  ]
+}
