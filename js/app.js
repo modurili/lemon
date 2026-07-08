@@ -427,7 +427,10 @@ function handleChoiceAnswer(selectedBtn, word, options) {
         : ""
     }
     <button class="choice-continue-btn" id="choiceContinueBtn">次へ</button>
+    ${renderAiPanelHtml()}
   `;
+  document.getElementById("aiPanel").style.display = "block";
+  bindAiChips(word);
 
   document.getElementById("choiceContinueBtn").onclick = () => submitRating(rating);
 }
