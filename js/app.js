@@ -4,6 +4,7 @@ import { settings } from "./settings.js";
 import { speak } from "./speech.js";
 import { ai } from "./ai.js";
 import { importDeckFromCsv } from "./import.js";
+import { reminders, startReminderWatcher } from "./reminders.js";
 
 const app = document.getElementById("app");
 
@@ -502,6 +503,9 @@ function renderSettings() {
       </div>
       <button class="save-btn" id="saveBtn">保存する</button>
 
+      <div class="settings-section-title">学習リマインダー</div>
+      <div id="reminderSection"></div>
+
       <div class="settings-section-title">単語帳</div>
       <button class="secondary-btn" id="importBtn" style="width:100%;margin-bottom:10px">CSVから単語帳をインポート</button>
 
@@ -511,6 +515,8 @@ function renderSettings() {
     </div>
     <div class="toast" id="toast"></div>
   `;
+
+  renderReminderSection();
 
   let selectedMode = mode;
 
@@ -543,6 +549,88 @@ function renderSettings() {
     settings.clearAll();
     showToast("全データを削除しました");
     setTimeout(() => location.reload(), 800);
+  };
+}
+
+// ---------- リマインダー ----------
+
+function renderReminderSection() {
+  const section = document.getElementById("reminderSection");
+  if (!section) return;
+
+  if (!reminders.isSupported()) {
+    section.innerHTML = `<div class="hint">このブラウザは通知に対応していません。</div>`;
+    return;
+  }
+
+  const permission = reminders.getPermission();
+  const list = reminders.list();
+
+  section.innerHTML = `
+    ${
+      permission !== "granted"
+        ? `<button class="secondary-btn" id="requestPermBtn" style="width:100%;margin-bottom:14px">通知を許可する</button>
+           <div class="hint" style="margin-bottom:14px">リマインダーには通知の許可が必要です。</div>`
+        : ""
+    }
+    <div class="reminder-list" id="reminderList">
+      ${
+        list.length === 0
+          ? `<div class="hint" style="margin-bottom:12px">まだリマインダーが設定されていません。</div>`
+          : list
+              .map(
+                (r) => `
+        <div class="reminder-row" data-id="${r.id}">
+          <button class="reminder-toggle ${r.enabled ? "on" : ""}" data-id="${r.id}" aria-label="有効・無効"></button>
+          <span class="reminder-time">${reminders.formatTime(r.hour, r.minute)}</span>
+          <button class="reminder-delete" data-id="${r.id}" aria-label="削除">${iconClose()}</button>
+        </div>`
+              )
+              .join("")
+      }
+    </div>
+    <div class="reminder-add-row">
+      <input type="time" id="reminderTimeInput" value="20:00" />
+      <button class="reminder-add-btn" id="reminderAddBtn">追加</button>
+    </div>
+    <div class="hint">アプリを開いている間、設定時刻になると通知します。ブラウザの制約上、完全に閉じている間は通知が届かない場合があります。</div>
+  `;
+
+  const requestBtn = document.getElementById("requestPermBtn");
+  if (requestBtn) {
+    requestBtn.onclick = async () => {
+      const result = await reminders.requestPermission();
+      if (result === "granted") {
+        showToast("通知を許可しました");
+        startReminderWatcher();
+      } else {
+        showToast("通知が許可されませんでした");
+      }
+      renderReminderSection();
+    };
+  }
+
+  section.querySelectorAll(".reminder-toggle").forEach((btn) => {
+    btn.onclick = () => {
+      const enabled = !btn.classList.contains("on");
+      reminders.toggle(btn.dataset.id, enabled);
+      renderReminderSection();
+    };
+  });
+
+  section.querySelectorAll(".reminder-delete").forEach((btn) => {
+    btn.onclick = () => {
+      reminders.remove(btn.dataset.id);
+      renderReminderSection();
+    };
+  });
+
+  document.getElementById("reminderAddBtn").onclick = () => {
+    const val = document.getElementById("reminderTimeInput").value;
+    if (!val) return;
+    const [h, m] = val.split(":").map(Number);
+    reminders.add(h, m);
+    renderReminderSection();
   };
 }
 
@@ -623,5 +711,8 @@ function escapeHtml(str) {
 (async function init() {
   await ensureSeedData();
   await registerServiceWorker();
+  if (reminders.isSupported() && reminders.getPermission() === "granted") {
+    startReminderWatcher();
+  }
   await renderHome();
 })();
