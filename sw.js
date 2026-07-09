@@ -4,7 +4,7 @@
  * AI通信（Gemini API）はキャッシュ対象外とし、常にネットワークへ通す。
  */
 
-const CACHE_NAME = "vocab-pwa-v2";
+const CACHE_NAME = "vocab-pwa-v3";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -17,6 +17,7 @@ const APP_SHELL = [
   "./js/ai.js",
   "./js/ui.js",
   "./js/import.js",
+  "./js/reminders.js",
   "./data/sample-deck.json",
 ];
 
@@ -55,6 +56,19 @@ self.addEventListener("fetch", (event) => {
           return response;
         })
         .catch(() => caches.match("./index.html"));
+    })
+  );
+});
+
+// 学習リマインダー通知をタップしたらアプリを開く（既存タブがあればそれをフォーカス）
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ("focus" in client) return client.focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow("./index.html");
     })
   );
 });
