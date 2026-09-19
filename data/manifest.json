@@ -1,0 +1,5 @@
+{
+  "decks": [
+    { "id": "yumetan_blue", "file": "data/yumetan_blue_sample.csv", "title": "夢たん Blue（サンプル10語）", "enabled": true }
+  ]
+}

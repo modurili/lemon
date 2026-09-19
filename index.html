@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<meta name="description" content="忘却曲線と習慣化で続けるモバイルファースト英単語学習PWA">
+<title>英単語ドリル</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="英単語ドリル">
+<link rel="stylesheet" href="./css/style.css">
+<style>#toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);background:#020617;border:1px solid #334155;color:#f1f5f9;padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:.25s;z-index:99;max-width:92vw}#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}</style>
+</head>
+<body>
+<header class="top">
+  <h1>英単語ドリル<small>忘却曲線 × 習慣化 ・ 2分セッション</small></h1>
+  <button id="installBtn" class="install small" hidden>📲 アプリ化</button>
+</header>
+
+<main>
+  <!-- ホーム -->
+  <section id="view-home" class="view">
+    <div class="card">
+      <h2>今日やること</h2>
+      <div class="row">
+        <div><div style="font-size:26px;font-weight:800" id="qDue">0</div><div class="muted small">復習(期限)</div></div>
+        <div><div style="font-size:26px;font-weight:800" id="qNew">0</div><div class="muted small">新規</div></div>
+        <div class="grow"></div>
+        <button id="startBtn" class="primary" style="min-width:140px">学習スタート</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>今日の目標</h2>
+      <div class="progress"><i id="todayBar" style="width:0%"></i></div>
+      <div class="row" style="margin-top:6px"><span id="todayTxt" class="small">0 / 5 語</span><span class="grow"></span><span id="streakTxt" class="small muted"></span></div>
+      <div id="weekDots" style="margin-top:8px" aria-label="今週の記録"></div>
+    </div>
+    <div class="card">
+      <h2>ライブラリ</h2>
+      <div class="muted small" id="totalTxt"></div>
+      <div class="row" style="margin-top:8px">
+        <button class="small ghost" onclick="document.querySelector('nav.tabs button[data-view=list]').click()">単語を探す</button>
+        <button class="small ghost" onclick="document.querySelector('nav.tabs button[data-view=settings]').click()">教材を追加</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 学習 -->
+  <section id="view-learn" class="view" hidden>
+    <div class="row"><span id="sesInfo" class="muted small"></span><span class="grow"></span></div>
+    <div class="progress" style="margin:6px 0 4px"><i id="sesProg" style="width:0%"></i></div>
+    <div id="cardBox"></div>
+  </section>
+
+  <!-- 一覧 -->
+  <section id="view-list" class="view" hidden>
+    <div class="row">
+      <input type="text" id="q" placeholder="単語・意味で検索" class="grow" autocomplete="off">
+    </div>
+    <div class="row" style="margin-top:8px">
+      <select id="deckFilter" class="grow"><option value="">全教材</option></select>
+      <select id="stFilter">
+        <option value="">全状態</option><option value="new">未学習</option>
+        <option value="due">復習期</option><option value="mature">定着</option>
+      </select>
+    </div>
+    <div class="muted small" id="listCount" style="margin-top:6px"></div>
+    <div id="listBox"></div>
+  </section>
+
+  <!-- 統計 -->
+  <section id="view-stats" class="view" hidden>
+    <div class="card"><h2>復習待ち</h2><div style="font-size:28px;font-weight:800" id="stDue">0</div>
+      <div class="muted small">期限切れはペナルティなし。今日のキューに自動で積まれます。</div></div>
+    <div class="card"><h2>定着(間隔21日以上)</h2><div style="font-size:28px;font-weight:800" id="stMature">0</div></div>
+    <div class="card"><h2>直近30日の正答率</h2><div style="font-size:28px;font-weight:800" id="stRet">—</div>
+      <div class="muted small">Good/Easy率。登録語数: <span id="stTotal">0</span></div></div>
+    <div class="card"><h2>直近7日</h2><div class="bars" id="weekBars"></div><div style="height:22px"></div></div>
+  </section>
+
+  <!-- 設定・教材 -->
+  <section id="view-settings" class="view" hidden>
+    <div class="card">
+      <h2>アプリ化</h2>
+      <p class="small muted">ホーム画面に入れると全画面・オフラインで使えます。</p>
+      <button id="installBtn2" class="install" hidden>📲 この端末にインストール</button>
+      <p class="small muted">ボタンが出ない場合: iPhoneは共有→「ホーム画面に追加」/ Android Chromeはメニュー→「インストール」。</p>
+    </div>
+    <div class="card">
+      <h2>習慣化の設定</h2>
+      <label class="f" for="setGoal">1日の目標(語)</label>
+      <input type="number" id="setGoal" min="1" max="100" value="5">
+      <label class="f" for="setNew">1日の新規(語)</label>
+      <input type="number" id="setNew" min="1" max="50" value="5">
+      <label class="f" for="setMode">出題モード</label>
+      <select id="setMode">
+        <option value="mix">ミックス(認識→想起→穴埋め)</option>
+        <option value="recog">認識のみ(EN→JA)</option>
+        <option value="recall">想起のみ(JA→EN入力)</option>
+        <option value="cloze">文脈穴埋めのみ</option>
+      </select>
+      <label class="f" for="setEx">例文の初期表示</label>
+      <select id="setEx">
+        <option value="highlight">ハイライト(目標語を強調)</option>
+        <option value="blank">穴埋め(目標語を隠す)</option>
+      </select>
+      <label class="f" for="setTime">リマインド時刻(任意)</label>
+      <input type="time" id="setTime">
+      <div class="row" style="margin-top:8px"><input type="checkbox" id="setNotify" style="width:auto;min-height:0"><label for="setNotify" class="small">毎日通知する(この端末で開いている間のみ有効)</label></div>
+      <div class="row" style="margin-top:10px"><button class="primary grow" id="saveSettings">保存</button></div>
+    </div>
+    <div class="card">
+      <h2>教材管理(CSVモジュール式)</h2>
+      <p class="small muted">形式: 連番,品詞,英単語,訳,その他の訳(;区切り),例文1,例文1訳,例文1何語目,例文2,例文2訳,例文2何語目,由来語源,備考。<br>
+      <code>data/*.csv</code> を置いて <code>data/manifest.json</code> に登録する方法と、下からの取込の両対応です。</p>
+      <label class="f" for="csvFile">CSVを取り込む</label>
+      <input type="file" id="csvFile" accept=".csv,text/csv">
+      <div id="importMsg" class="small" style="margin-top:8px"></div>
+      <div id="deckBox" style="margin-top:8px"></div>
+    </div>
+    <div class="card">
+      <h2>データ</h2>
+      <div class="row"><button class="small ghost" id="resetAll">学習履歴を全消去</button></div>
+      <p class="small muted">履歴はこの端末のlocalStorageのみに保存されます。サーバ送信はありません。</p>
+    </div>
+  </section>
+</main>
+
+<dialog id="detail">
+  <div class="dlg-head"><strong class="grow">単語詳細</strong><button class="small" id="closeDetail">閉じる</button></div>
+  <div class="dlg-body" id="detailBody"></div>
+</dialog>
+
+<nav class="tabs" aria-label="メニュー">
+  <button data-view="home" class="on"><span class="ic">🏠</span>ホーム</button>
+  <button data-view="learn"><span class="ic">📝</span>学習</button>
+  <button data-view="list"><span class="ic">🔍</span>一覧</button>
+  <button data-view="stats"><span class="ic">📊</span>統計</button>
+  <button data-view="settings"><span class="ic">⚙️</span>設定</button>
+</nav>
+
+<script src="./js/csv.js"></script>
+<script src="./js/srs.js"></script>
+<script src="./js/store.js"></script>
+<script src="./js/app.js"></script>
+</body>
+</html>
