@@ -8,6 +8,35 @@ const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+/* アイコン */
+const IC = {
+  eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.5 10.5 0 0 1 12 19c-6.5 0-10-7-10-7a17.6 17.6 0 0 1 4.06-4.94M9.9 4.24A9.5 9.5 0 0 1 12 5c6.5 0 10 7 10 7a17.7 17.7 0 0 1-2.16 3.19M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="m2 2 20 20"/></svg>',
+  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
+};
+
+/* オリジナル選択UI(セグメント) */
+function segInit(id, val) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.dataset.val = val;
+  [...el.querySelectorAll('button')].forEach((b) => {
+    const on = b.dataset.v === val;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-checked', on);
+    b.onclick = () => {
+      el.dataset.val = b.dataset.v;
+      [...el.querySelectorAll('button')].forEach((x) => {
+        const o = x === b;
+        x.classList.toggle('on', o);
+        x.setAttribute('aria-checked', o);
+      });
+    };
+  });
+}
+function segVal(id) { return document.getElementById(id)?.dataset.val; }
+
 /* ---------- 例文ハイライト / 穴埋め ---------- */
 // nは1始まりの「何語目」。空白区切りトークン基準。
 function splitKeep(s) { return String(s || '').split(/(\s+)/); }
@@ -381,7 +410,7 @@ function openDetail(id) {
     ${c.alt?.length ? `<div class="muted small">ほか: ${esc(c.alt.join(' / '))}</div>` : ''}
     <div class="row" style="margin:8px 0">
       <button class="small" id="tglEx">表示切替: ${showBlank ? '穴埋め' : 'ハイライト'}</button>
-      <span class="muted small">出題時は穴埋め・確認時はハイライトが基本です</span>
+      <span class="helpwrap"><button class="help" type="button" aria-label="ヘルプ">?</button><span class="bubble">出題時は穴埋め・確認時はハイライトが基本です。</span></span>
     </div>
     <div id="exs">${exHtml}</div>
     ${c.etym ? `<div class="card"><h2>由来・語源</h2><p class="small">${esc(c.etym)}</p></div>` : ''}
@@ -429,35 +458,54 @@ function renderStats() {
   $('#stMature').textContent = matureN;
   $('#stTotal').textContent = cards.length;
   $('#stRet').textContent = last30.length ? `${ret}%(${last30.length}件)` : '—';
-  const bars = [];
-  let mx = 1;
-  const vals = [];
-  for (let back = 6; back >= 0; back--) {
-    const d = new Date(); d.setDate(d.getDate() - back);
+  renderGrass();
+}
+
+/* 草(学習記録カレンダー): 直近17週をGitHub風ヒートマップで */
+function renderGrass() {
+  const box = $('#grass');
+  if (!box) return;
+  const WEEKS = 17;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const start = new Date(today); start.setDate(start.getDate() - (WEEKS * 7 - 1));
+  start.setDate(start.getDate() - start.getDay()); // 直前の日曜に揃える
+  const cells = [];
+  let total = 0, max = 1;
+  for (let i = 0; i < WEEKS * 7; i++) {
+    const d = new Date(start); d.setDate(d.getDate() + i);
+    if (d > today) { cells.push(null); continue; }
     const v = Store.mem.activity[Store.todayKey(d)] || 0;
-    vals.push({ v, today: back === 0, label: `${d.getMonth() + 1}/${d.getDate()}` });
-    mx = Math.max(mx, v);
+    cells.push({ d, v });
+    total += v; max = Math.max(max, v);
   }
-  $('#weekBars').innerHTML = vals.map((x) =>
-    `<div class="${x.today ? 'today' : ''}" style="height:${Math.round((x.v / mx) * 80) + 4}px" title="${x.v}語"><span>${x.label}</span></div>`).join('');
+  box.innerHTML = cells.map((c) => {
+    if (!c) return '<i class="none"></i>';
+    const lv = c.v === 0 ? '' : 'lv' + Math.min(4, Math.ceil((c.v / max) * 4));
+    const label = `${c.d.getMonth() + 1}/${c.d.getDate()}: ${c.v}語`;
+    return `<i class="${lv}" title="${label}"></i>`;
+  }).join('');
+  $('#grassTotal').textContent = `${total}語`;
+  const d0 = new Date(today); d0.setDate(d0.getDate() - (WEEKS * 7 - 1));
+  $('#grassRange').textContent = `過去${WEEKS}週(${d0.getMonth() + 1}/${d0.getDate()}〜)の学習量`;
 }
 
 /* ---------- 設定・教材管理 ---------- */
 function renderSettings() {
   const s = Store.mem.settings;
   $('#setGoal').value = s.dailyGoal; $('#setNew').value = s.newPerDay;
-  $('#setMode').value = s.mode; $('#setEx').value = s.exDisplay;
+  segInit('segMode', s.mode); segInit('segEx', s.exDisplay);
   $('#setTime').value = s.remindTime || '';
   $('#setNotify').checked = !!s.notifyOn;
+  updateNotifyState();
   const decks = Object.values(Store.mem.decks);
   $('#deckBox').innerHTML = decks.map((d) => `
     <div class="card"><div class="row"><strong>${esc(d.title)}</strong><span class="grow"></span>
       <span class="pill">${d.enabled ? '有効' : '無効'}</span></div>
     <div class="muted small">${esc(d.id)} ・ ${d.custom ? '取込教材' : esc(d.file || '')} ・ ${d.count ?? Object.values(Store.mem.cards).filter((c) => c.deckId === d.id).length}語</div>
     <div class="row" style="margin-top:8px">
-      <button class="small" data-act="toggle" data-id="${esc(d.id)}">${d.enabled ? '無効化' : '有効化'}</button>
-      <button class="small" data-act="export" data-id="${esc(d.id)}">書出</button>
-      <button class="small" data-act="del" data-id="${esc(d.id)}">${d.custom ? '削除' : '非表示'}</button>
+      <button class="iconbtn ${d.enabled ? '' : 'off'}" data-act="toggle" data-id="${esc(d.id)}" title="${d.enabled ? '無効にする' : '有効にする'}" aria-label="${d.enabled ? '無効にする' : '有効にする'}">${d.enabled ? IC.eye : IC.eyeOff}</button>
+      <button class="iconbtn" data-act="export" data-id="${esc(d.id)}" title="CSVで書き出す" aria-label="CSVで書き出す">${IC.download}</button>
+      <button class="iconbtn danger" data-act="del" data-id="${esc(d.id)}" title="${d.custom ? '削除する' : '非表示にする'}" aria-label="${d.custom ? '削除する' : '非表示にする'}">${IC.trash}</button>
     </div></div>`).join('') || '<p class="muted">教材がありません。CSVを取り込んでください。</p>';
   $$('#deckBox button').forEach((b) => (b.onclick = () => deckAction(b.dataset.act, b.dataset.id)));
 }
@@ -507,9 +555,36 @@ function scheduleNotify() {
   const next = new Date(); next.setHours(h, m, 0, 0);
   if (next <= new Date()) next.setDate(next.getDate() + 1);
   notifyTimer = setTimeout(() => {
-    try { new Notification('英単語ドリル', { body: `今日の${s.dailyGoal}語、2分だけやりませんか?` }); } catch { /* 権限なし */ }
+    try { new Notification('lemon', { body: `今日の${s.dailyGoal}語、2分だけやりませんか?`, icon: './icons/icon-192.png' }); } catch { /* 権限なし */ }
     scheduleNotify();
   }, next - Date.now());
+}
+
+function updateNotifyState() {
+  const el = $('#notifyState');
+  if (!el) return;
+  if (!('Notification' in window)) { el.textContent = 'このブラウザは通知に未対応です'; return; }
+  el.textContent = '許可状態: ' + ({ granted: '許可済み', denied: '拒否されています', default: '未確認' })[Notification.permission];
+}
+
+async function testNotify() {
+  if (!('Notification' in window)) { toast('このブラウザは通知に未対応です'); return; }
+  let p = Notification.permission;
+  if (p === 'default') {
+    try { p = await Notification.requestPermission(); } catch { p = Notification.permission; }
+  }
+  updateNotifyState();
+  if (p !== 'granted') {
+    toast('通知が許可されていません。端末の設定から許可してください');
+    return;
+  }
+  try {
+    new Notification('lemon テスト通知', {
+      body: '通知は正常です。リマインドもこの表示で届きます(アプリを開いている間のみ有効)。',
+      icon: './icons/icon-192.png',
+    });
+    toast('テスト通知を送信しました');
+  } catch { toast('通知の表示に失敗しました'); }
 }
 
 /* ---------- 起動 ---------- */
@@ -528,17 +603,33 @@ async function boot() {
   $('#saveSettings').onclick = async () => {
     Store.mem.settings.dailyGoal = Math.max(1, +$('#setGoal').value || 5);
     Store.mem.settings.newPerDay = Math.max(1, +$('#setNew').value || 5);
-    Store.mem.settings.mode = $('#setMode').value;
-    Store.mem.settings.exDisplay = $('#setEx').value;
+    Store.mem.settings.mode = segVal('segMode') || 'mix';
+    Store.mem.settings.exDisplay = segVal('segEx') || 'highlight';
     Store.mem.settings.remindTime = $('#setTime').value;
     Store.mem.settings.notifyOn = $('#setNotify').checked;
     if (Store.mem.settings.notifyOn && 'Notification' in window) {
       const p = await Notification.requestPermission();
       if (p !== 'granted') { Store.mem.settings.notifyOn = false; toast('通知が許可されませんでした'); }
     }
-    Store.save(); scheduleNotify(); renderHome(); toast('設定を保存しました');
+    Store.save(); scheduleNotify(); renderHome();
+    $('#setNotify').checked = Store.mem.settings.notifyOn;
+    updateNotifyState();
+    toast('設定を保存しました');
   };
   $('#csvFile').addEventListener('change', (e) => { if (e.target.files[0]) importFile(e.target.files[0]); e.target.value = ''; });
+  $('#testNotify').onclick = testNotify;
+  // はてなヘルプ: タップで開閉(ホバーはCSS)、他所タップで閉じる
+  document.addEventListener('click', (e) => {
+    const h = e.target.closest('.help');
+    if (h) {
+      const w = h.closest('.helpwrap');
+      const was = w.classList.contains('open');
+      $$('.helpwrap.open').forEach((x) => x.classList.remove('open'));
+      if (!was) w.classList.add('open');
+      return;
+    }
+    if (!e.target.closest('.helpwrap')) $$('.helpwrap.open').forEach((x) => x.classList.remove('open'));
+  });
   $('#closeDetail').onclick = () => $('#detail').close();
   $('#resetAll').onclick = () => {
     if (!confirm('学習履歴・設定をすべて消去しますか?')) return;

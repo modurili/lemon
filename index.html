@@ -5,20 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#4f46e5">
 <meta name="description" content="忘却曲線と習慣化で続けるモバイルファースト英単語学習PWA">
-<title>英単語ドリル</title>
+<title>lemon</title>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icons/icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="./icons/icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="英単語ドリル">
+<meta name="apple-mobile-web-app-title" content="lemon">
 <link rel="stylesheet" href="./css/style.css">
 </head>
 <body>
 <header class="top">
-  <span class="brand">E</span>
-  <h1>英単語ドリル<small>忘却曲線 × 習慣化 ・ 2分セッション</small></h1>
+  <img class="brand-img" src="./icons/icon-192.png" alt="lemon" width="38" height="38">
+  <h1>lemon</h1>
   <button id="installBtn" class="install small" hidden>アプリ化</button>
 </header>
 
@@ -74,21 +74,21 @@
 
   <!-- 統計 -->
   <section id="view-stats" class="view" hidden>
-    <div class="card"><h2>復習待ち</h2><div class="bignum" id="stDue">0</div>
-      <div class="muted small">期限切れはペナルティなし。今日のキューに自動で積まれます。</div></div>
+    <div class="card"><h2>復習待ち <span class="helpwrap"><button class="help" type="button" aria-label="ヘルプ">?</button><span class="bubble">期限切れはペナルティなし。今日のキューに自動で積まれます。</span></span></h2><div class="bignum" id="stDue">0</div></div>
     <div class="card"><h2>定着(間隔21日以上)</h2><div class="bignum" id="stMature">0</div></div>
-    <div class="card"><h2>直近30日の正答率</h2><div class="bignum" id="stRet">—</div>
-      <div class="muted small">Good/Easy率。登録語数: <span id="stTotal">0</span></div></div>
-    <div class="card"><h2>直近7日</h2><div class="bars" id="weekBars"></div><div style="height:22px"></div></div>
+    <div class="card"><h2>直近30日の正答率 <span class="helpwrap"><button class="help" type="button" aria-label="ヘルプ">?</button><span class="bubble">Good / Easy と自己評価した割合です。登録語数も併せて表示します。</span></span></h2><div class="bignum" id="stRet">—</div>
+      <div class="muted small">登録語数: <span id="stTotal">0</span></div></div>
+    <div class="card"><h2>学習の記録</h2><div class="bignum" id="grassTotal">0</div>
+      <div class="muted small" id="grassRange"></div>
+      <div class="grass" id="grass" role="img" aria-label="学習記録カレンダー"></div>
+      <div class="grass-legend"><span>少ない</span><i class="c"></i><i class="c lv1"></i><i class="c lv2"></i><i class="c lv3"></i><i class="c lv4"></i><span>多い</span></div></div>
   </section>
 
   <!-- 設定・教材 -->
   <section id="view-settings" class="view" hidden>
     <div class="card">
-      <h2>アプリ化</h2>
-      <p class="small muted">ホーム画面に入れると全画面・オフラインで使えます。</p>
+      <h2>アプリ化 <span class="helpwrap"><button class="help" type="button" aria-label="ヘルプ">?</button><span class="bubble">ホーム画面に入れると全画面・オフラインで使えます。ボタンが出ない場合、iPhoneは共有→「ホーム画面に追加」、Android Chromeはメニュー→「インストール」です。</span></span></h2>
       <button id="installBtn2" class="install" hidden>この端末にインストール</button>
-      <p class="small muted">ボタンが出ない場合: iPhoneは共有→「ホーム画面に追加」/ Android Chromeはメニュー→「インストール」。</p>
     </div>
     <div class="card">
       <h2>習慣化の設定</h2>
@@ -96,36 +96,35 @@
       <input type="number" id="setGoal" min="1" max="100" value="5">
       <label class="f" for="setNew">1日の新規(語)</label>
       <input type="number" id="setNew" min="1" max="50" value="5">
-      <label class="f" for="setMode">出題モード</label>
-      <select id="setMode">
-        <option value="mix">ミックス(認識→想起→穴埋め)</option>
-        <option value="recog">認識のみ(EN→JA)</option>
-        <option value="recall">想起のみ(JA→EN入力)</option>
-        <option value="cloze">文脈穴埋めのみ</option>
-      </select>
-      <label class="f" for="setEx">例文の初期表示</label>
-      <select id="setEx">
-        <option value="highlight">ハイライト(目標語を強調)</option>
-        <option value="blank">穴埋め(目標語を隠す)</option>
-      </select>
+      <label class="f">出題モード</label>
+      <div class="seg" id="segMode" role="radiogroup" aria-label="出題モード">
+        <button type="button" data-v="mix">ミックス<small>認識→想起→穴埋め</small></button>
+        <button type="button" data-v="recog">認識<small>EN→JA</small></button>
+        <button type="button" data-v="recall">想起<small>JA→EN入力</small></button>
+        <button type="button" data-v="cloze">穴埋め<small>文脈</small></button>
+      </div>
+      <label class="f">例文の初期表示</label>
+      <div class="seg seg2" id="segEx" role="radiogroup" aria-label="例文の初期表示">
+        <button type="button" data-v="highlight">ハイライト<small>目標語を強調</small></button>
+        <button type="button" data-v="blank">穴埋め<small>目標語を隠す</small></button>
+      </div>
       <label class="f" for="setTime">リマインド時刻(任意)</label>
       <input type="time" id="setTime">
-      <div class="row" style="margin-top:8px"><input type="checkbox" id="setNotify" style="width:auto;min-height:0"><label for="setNotify" class="small">毎日通知する(この端末で開いている間のみ有効)</label></div>
+      <div class="row" style="margin-top:10px"><input type="checkbox" id="setNotify" style="width:auto;min-height:0"><label for="setNotify" class="small">毎日通知する</label>
+        <span class="helpwrap"><button class="help" type="button" aria-label="ヘルプ">?</button><span class="bubble">サーバを使わないため、通知はこのアプリを開いている間のみ届きます。閉じている間の通知は端末の機能ではできません。</span></span></div>
+      <div class="row" style="margin-top:8px"><button class="small" id="testNotify" type="button">通知をテスト</button><span class="small muted" id="notifyState"></span></div>
       <div class="row" style="margin-top:10px"><button class="primary grow" id="saveSettings">保存</button></div>
     </div>
     <div class="card">
-      <h2>教材管理(CSVモジュール式)</h2>
-      <p class="small muted">形式: 連番,品詞,英単語,訳,その他の訳(;区切り),例文1,例文1訳,例文1何語目,例文2,例文2訳,例文2何語目,由来語源,備考。<br>
-      <code>data/*.csv</code> を置いて <code>data/manifest.json</code> に登録する方法と、下からの取込の両対応です。</p>
-      <label class="f" for="csvFile">CSVを取り込む</label>
-      <input type="file" id="csvFile" accept=".csv,text/csv">
+      <h2>教材管理 <span class="helpwrap"><button class="help" type="button" aria-label="ヘルプ">?</button><span class="bubble">CSVは13列形式(連番,品詞,英単語,訳,その他の訳,例文1,例文1訳,例文1何語目,例文2,例文2訳,例文2何語目,由来語源,備考)です。dataフォルダに置いてmanifest.jsonに登録する方法と、下からの取込の両対応です。</span></span></h2>
+      <label class="file-drop" for="csvFile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0 4 4m-4-4L8 8"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg><span>CSVファイルを選ぶ<small>タップして .csv を選択</small></span></label>
+      <input type="file" id="csvFile" class="sr-file" accept=".csv,text/csv" tabindex="-1">
       <div id="importMsg" class="small" style="margin-top:8px"></div>
       <div id="deckBox" style="margin-top:8px"></div>
     </div>
     <div class="card">
-      <h2>データ</h2>
+      <h2>データ <span class="helpwrap"><button class="help" type="button" aria-label="ヘルプ">?</button><span class="bubble">履歴はこの端末のlocalStorageのみに保存されます。サーバ送信はありません。</span></span></h2>
       <div class="row"><button class="small ghost" id="resetAll">学習履歴を全消去</button></div>
-      <p class="small muted">履歴はこの端末のlocalStorageのみに保存されます。サーバ送信はありません。</p>
     </div>
   </section>
 </main>

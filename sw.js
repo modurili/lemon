@@ -1,5 +1,5 @@
 /* 英単語ドリル Service Worker — GitHub Pages のサブパスでも動くよう相対解決のみ使う */
-const VERSION = 'etan-v2';
+const VERSION = 'etan-v3';
 const CORE = [
   './',
   './index.html',
