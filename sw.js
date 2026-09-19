@@ -1,5 +1,5 @@
-/* 英単語ドリル Service Worker — GitHub Pages のサブパスでも動くよう相対解決のみ使う */
-const VERSION = 'etan-v3';
+/* lemon Service Worker — GitHub Pages のサブパスでも動くよう相対解決のみ使う */
+const VERSION = 'etan-v8';
 const CORE = [
   './',
   './index.html',
@@ -42,4 +42,13 @@ self.addEventListener('fetch', (e) => {
     caches.open(VERSION).then((c) => c.put(request, copy));
     return res;
   }).catch(() => caches.match('./index.html'))));
+});
+
+// 通知タップでアプリを開く/前面に出す
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    for (const c of list) { if ('focus' in c) return c.focus(); }
+    if (clients.openWindow) return clients.openWindow('./');
+  }));
 });

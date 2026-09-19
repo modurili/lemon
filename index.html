@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#4f46e5">
+<meta name="theme-color" content="#121212">
 <meta name="description" content="忘却曲線と習慣化で続けるモバイルファースト英単語学習PWA">
 <title>lemon</title>
 <link rel="manifest" href="./manifest.webmanifest">
@@ -51,8 +51,8 @@
 
   <!-- 学習 -->
   <section id="view-learn" class="view" hidden>
-    <div class="row"><span id="sesInfo" class="muted small"></span><span class="grow"></span></div>
-    <div class="progress" style="margin:6px 0 4px"><i id="sesProg" style="width:0%"></i></div>
+    <div class="ses-top"><button id="sesQuit" type="button" aria-label="セッションを終了">✕</button><span class="modepill" id="sesMode"></span><span class="grow"></span><span id="sesInfo" class="muted small"></span><button id="sesUndo" type="button" aria-label="直前の採点を取り消す" title="直前の採点を取り消す" disabled>↩</button></div>
+    <div class="progress" style="margin:10px 0"><i id="sesProg" style="width:0%"></i></div>
     <div id="cardBox"></div>
   </section>
 
@@ -62,11 +62,8 @@
       <input type="text" id="q" placeholder="単語・意味で検索" class="grow" autocomplete="off">
     </div>
     <div class="row" style="margin-top:8px">
-      <select id="deckFilter" class="grow"><option value="">全教材</option></select>
-      <select id="stFilter">
-        <option value="">全状態</option><option value="new">未学習</option>
-        <option value="due">復習期</option><option value="mature">定着</option>
-      </select>
+      <div class="dd grow" id="ddDeck"><button type="button" class="dd-btn"><span>全教材</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button><div class="dd-list" hidden></div></div>
+      <div class="dd" id="ddState" style="min-width:136px"><button type="button" class="dd-btn"><span>全状態</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button><div class="dd-list" hidden></div></div>
     </div>
     <div class="muted small" id="listCount" style="margin-top:6px"></div>
     <div id="listBox"></div>
@@ -80,15 +77,33 @@
       <div class="muted small">登録語数: <span id="stTotal">0</span></div></div>
     <div class="card"><h2>学習の記録</h2><div class="bignum" id="grassTotal">0</div>
       <div class="muted small" id="grassRange"></div>
-      <div class="grass" id="grass" role="img" aria-label="学習記録カレンダー"></div>
-      <div class="grass-legend"><span>少ない</span><i class="c"></i><i class="c lv1"></i><i class="c lv2"></i><i class="c lv3"></i><i class="c lv4"></i><span>多い</span></div></div>
+      <div class="calwrap">
+        <div class="caldays" aria-hidden="true"><span></span><span>月</span><span></span><span>水</span><span></span><span>金</span><span></span></div>
+        <div class="calscroll">
+          <div class="calmonths" id="grassMonths" aria-hidden="true"></div>
+          <div class="grass" id="grass" role="img" aria-label="学習記録カレンダー"></div>
+        </div>
+      </div>
+      <div class="grass-legend"><span>少ない</span><i class="lv0"></i><i class="lv1"></i><i class="lv2"></i><i class="lv3"></i><i class="lv4"></i><span>多い</span></div></div>
   </section>
 
   <!-- 設定・教材 -->
   <section id="view-settings" class="view" hidden>
-    <div class="card">
+    <div class="card" id="installCard">
       <h2>アプリ化 <span class="helpwrap"><button class="help" type="button" aria-label="ヘルプ">?</button><span class="bubble">ホーム画面に入れると全画面・オフラインで使えます。ボタンが出ない場合、iPhoneは共有→「ホーム画面に追加」、Android Chromeはメニュー→「インストール」です。</span></span></h2>
       <button id="installBtn2" class="install" hidden>この端末にインストール</button>
+    </div>
+    <div class="card">
+      <h2>デザイン</h2>
+      <label class="f">アクセントカラー</label>
+      <div class="swatches" id="swAcc">
+        <button type="button" data-c="#5bb88a" style="--sw:#5bb88a" aria-label="グリーン"></button>
+        <button type="button" data-c="#4ec9c0" style="--sw:#4ec9c0" aria-label="ターコイズ"></button>
+        <button type="button" data-c="#5b96d4" style="--sw:#5b96d4" aria-label="ブルー"></button>
+        <button type="button" data-c="#9b7de0" style="--sw:#9b7de0" aria-label="パープル"></button>
+        <button type="button" data-c="#e06fa0" style="--sw:#e06fa0" aria-label="ピンク"></button>
+        <button type="button" data-c="#e08050" style="--sw:#e08050" aria-label="オレンジ"></button>
+      </div>
     </div>
     <div class="card">
       <h2>習慣化の設定</h2>
@@ -108,9 +123,19 @@
         <button type="button" data-v="highlight">ハイライト<small>目標語を強調</small></button>
         <button type="button" data-v="blank">穴埋め<small>目標語を隠す</small></button>
       </div>
-      <label class="f" for="setTime">リマインド時刻(任意)</label>
-      <input type="time" id="setTime">
-      <div class="row" style="margin-top:10px"><input type="checkbox" id="setNotify" style="width:auto;min-height:0"><label for="setNotify" class="small">毎日通知する</label>
+      <label class="f">リマインド時刻</label>
+      <div class="wpresets" id="wPresets">
+        <button type="button" data-t="07:00">朝 7:00</button>
+        <button type="button" data-t="12:00">昼 12:00</button>
+        <button type="button" data-t="21:00">夜 21:00</button>
+      </div>
+      <div class="twrap">
+        <div class="wheel" id="whHour" aria-label="時"></div>
+        <span class="wcolon">:</span>
+        <div class="wheel" id="whMin" aria-label="分"></div>
+      </div>
+      <div class="row" style="margin-top:12px"><div class="grow"><div style="font-weight:700">毎日のリマインド</div><div class="small muted">その日にやることがあるときだけ届きます</div></div>
+        <button type="button" class="switch" id="swNotify" role="switch" aria-checked="false" aria-label="毎日のリマインド"><i></i></button>
         <span class="helpwrap"><button class="help" type="button" aria-label="ヘルプ">?</button><span class="bubble">サーバを使わないため、通知はこのアプリを開いている間のみ届きます。閉じている間の通知は端末の機能ではできません。</span></span></div>
       <div class="row" style="margin-top:8px"><button class="small" id="testNotify" type="button">通知をテスト</button><span class="small muted" id="notifyState"></span></div>
       <div class="row" style="margin-top:10px"><button class="primary grow" id="saveSettings">保存</button></div>
@@ -122,9 +147,9 @@
       <div id="importMsg" class="small" style="margin-top:8px"></div>
       <div id="deckBox" style="margin-top:8px"></div>
     </div>
-    <div class="card">
+    <div class="card danger-card">
       <h2>データ <span class="helpwrap"><button class="help" type="button" aria-label="ヘルプ">?</button><span class="bubble">履歴はこの端末のlocalStorageのみに保存されます。サーバ送信はありません。</span></span></h2>
-      <div class="row"><button class="small ghost" id="resetAll">学習履歴を全消去</button></div>
+      <button class="danger-zone" id="resetAll"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg><span>学習履歴を全消去<small>登録語・履歴・設定すべて</small></span></button>
     </div>
   </section>
 </main>
@@ -135,6 +160,15 @@
   <div class="dlg-body" id="detailBody"></div>
   </div>
 </dialog>
+
+<div class="veil" id="cfVeil" hidden>
+  <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="cfTitle">
+    <div class="modal-ic" id="cfIcon"></div>
+    <h3 id="cfTitle"></h3>
+    <p id="cfBody"></p>
+    <div class="row"><button class="ghost grow" id="cfCancel">キャンセル</button><button class="primary grow" id="cfOk">OK</button></div>
+  </div>
+</div>
 
 <nav class="tabs" aria-label="メニュー">
   <button data-view="home" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>ホーム</button>

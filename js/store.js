@@ -13,6 +13,7 @@ function defaultSettings() {
     mode: 'mix', // recog | recall | cloze | mix
     exDisplay: 'highlight', // highlight | blank (詳細画面の初期表示)
     remindTime: '', notifyOn: false,
+    accent: '#5bb88a',
   };
 }
 
@@ -23,12 +24,12 @@ function load() {
     const d = JSON.parse(raw);
     if (!d.settings) d.settings = defaultSettings();
     d.decks ||= {}; d.cards ||= {}; d.progress ||= {};
-    d.activity ||= {}; d.overrides ||= {}; d.reviews ||= [];
+    d.activity ||= {}; d.overrides ||= {}; d.reviews ||= []; d.deckGone ||= {};
     return d;
   } catch { return blank(); }
 }
 function blank() {
-  return { decks: {}, cards: {}, progress: {}, activity: {}, settings: defaultSettings(), overrides: {}, reviews: [] };
+  return { decks: {}, cards: {}, progress: {}, activity: {}, settings: defaultSettings(), overrides: {}, reviews: [], deckGone: {} };
 }
 
 let mem = load();

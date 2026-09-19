@@ -14,6 +14,7 @@ const IC = {
   eyeOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.5 10.5 0 0 1 12 19c-6.5 0-10-7-10-7a17.6 17.6 0 0 1 4.06-4.94M9.9 4.24A9.5 9.5 0 0 1 12 5c6.5 0 10 7 10 7a17.7 17.7 0 0 1-2.16 3.19M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="m2 2 20 20"/></svg>',
   download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
+  say: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>',
 };
 
 /* オリジナル選択UI(セグメント) */
@@ -36,6 +37,219 @@ function segInit(id, val) {
   });
 }
 function segVal(id) { return document.getElementById(id)?.dataset.val; }
+
+/* アクセントカラー: 設定値+ライト/ダークから派生変数を計算 */
+function hexRgb(h) {
+  h = h.replace('#', '');
+  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  return [0, 2, 4].map((i) => parseInt(h.substr(i, 2), 16));
+}
+function mixCss(h1, h2, t) {
+  const a = hexRgb(h1), b = hexRgb(h2);
+  return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(', ')})`;
+}
+function rgbaCss(h, a) {
+  const [r, g, b] = hexRgb(h);
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+function applyAccent() {
+  const acc = Store.mem.settings.accent || '#5bb88a';
+  const light = window.matchMedia('(prefers-color-scheme: light)').matches;
+  const st = document.documentElement.style;
+  st.setProperty('--acc', acc);
+  st.setProperty('--grad', `linear-gradient(135deg, ${acc}, ${mixCss(acc, '#0f172a', 0.38)})`);
+  st.setProperty('--acc-tx', mixCss(acc, light ? '#000000' : '#ffffff', light ? 0.32 : 0.45));
+  st.setProperty('--acc-lt', mixCss(acc, light ? '#000000' : '#ffffff', light ? 0.10 : 0.25));
+  st.setProperty('--acc-dk', mixCss(acc, '#000000', 0.30));
+  st.setProperty('--glow', rgbaCss(acc, light ? 0.12 : 0.16));
+  st.setProperty('--acc-shadow', rgbaCss(acc, light ? 0.25 : 0.45));
+  [7, 10, 12, 14, 16, 25, 35, 40, 60].forEach((p) => st.setProperty(`--t${p}`, rgbaCss(acc, p / 100)));
+}
+
+/* オリジナル確認モーダル */
+const IC_WARN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4m0 4h.01M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z"/></svg>';
+function askConfirm({ title, body, okText = 'OK', danger = false }) {
+  return new Promise((resolve) => {
+    const veil = $('#cfVeil');
+    $('#cfTitle').textContent = title;
+    $('#cfBody').textContent = body;
+    const ok = $('#cfOk');
+    ok.textContent = okText;
+    ok.classList.toggle('danger-ok', danger);
+    $('#cfIcon').innerHTML = IC_WARN;
+    $('#cfIcon').classList.toggle('danger', danger);
+    veil.hidden = false;
+    const done = (v) => { veil.hidden = true; resolve(v); };
+    $('#cfCancel').onclick = () => done(false);
+    ok.onclick = () => done(true);
+    veil.onclick = (e) => { if (e.target === veil) done(false); };
+  });
+}
+
+/* 通知送信: SW経由を優先(失敗時は従来方式) */
+function iconURL() { try { return new URL('./icons/icon-192.png', location.href).href; } catch { return './icons/icon-192.png'; } }
+async function fireNotification(title, body) {
+  try {
+    if ('serviceWorker' in navigator && window.Notification?.permission === 'granted') {
+      const reg = await navigator.serviceWorker.ready;
+      if (reg?.showNotification) {
+        await reg.showNotification(title, { body, icon: iconURL(), tag: 'lemon-remind' });
+        return true;
+      }
+    }
+  } catch { /* フォールバックへ */ }
+  try {
+    new Notification(title, { body, icon: iconURL() });
+    return true;
+  } catch { return false; }
+}
+
+/* はてなバブルのはみ出し補正 */
+function fitBubble(wrap) {
+  const b = wrap.querySelector('.bubble');
+  if (!b) return;
+  b.style.marginLeft = '0px';
+  wrap.classList.remove('below');
+  requestAnimationFrame(() => {
+    // 上に空きがなければ下開きに反転
+    if (wrap.getBoundingClientRect().top < b.offsetHeight + 16) wrap.classList.add('below');
+    // visualViewport基準: バブルのはみ出しでlayout viewportが広がっても狂わない
+    const vw = window.visualViewport ? window.visualViewport.width : window.innerWidth;
+    const r = b.getBoundingClientRect();
+    let dx = 0;
+    if (r.left < 8) dx = 8 - r.left;
+    else if (r.right > vw - 8) dx = vw - 8 - r.right;
+    if (dx) b.style.marginLeft = dx + 'px';
+  });
+}
+function closeHelps() {
+  $$('.helpwrap.open').forEach((x) => { x.classList.remove('open', 'below'); const b = x.querySelector('.bubble'); if (b) b.style.marginLeft = '0px'; });
+}
+
+/* 画面端で切れない汎用ポップオーバー(草タップ等) */
+let popEl = null, popAnchor = null;
+function showPopover(anchor, html) {
+  if (popAnchor === anchor && popEl) { hidePopover(); return; }
+  hidePopover();
+  popAnchor = anchor;
+  popEl = document.createElement('div');
+  popEl.className = 'gpop';
+  popEl.innerHTML = html;
+  popEl.style.visibility = 'hidden';
+  document.body.appendChild(popEl);
+  const vw = window.visualViewport ? window.visualViewport.width : window.innerWidth;
+  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const r = anchor.getBoundingClientRect();
+  const pw = popEl.offsetWidth, ph = popEl.offsetHeight;
+  const x = Math.min(Math.max(8, r.left + r.width / 2 - pw / 2), Math.max(8, vw - pw - 8));
+  let y = r.top - ph - 8;
+  if (y < 8) y = r.bottom + 8;
+  if (y + ph > vh - 8) y = Math.max(8, vh - ph - 8);
+  popEl.style.left = `${x}px`;
+  popEl.style.top = `${y}px`;
+  popEl.style.visibility = '';
+}
+function hidePopover() { if (popEl) popEl.remove(); popEl = null; popAnchor = null; }
+
+/* その日の記録 */
+function dayStats(key) {
+  const n = Store.mem.activity[key] || 0;
+  const revs = Store.mem.reviews.filter((r) => Store.todayKey(new Date(r.t)) === key);
+  const good = revs.filter((r) => r.grade >= 2).length;
+  return { n, total: revs.length, good };
+}
+
+/* 次回間隔の表示(Anki式: ボタンに次回表示) */
+function fmtDue(ms) {
+  const m = Math.max(0, Math.round(ms / 60000));
+  if (m < 1) return 'すぐ';
+  if (m < 60) return `${m}分後`;
+  const h = m / 60;
+  if (h < 24) return `${Math.round(h)}時間後`;
+  const d = h / 24;
+  if (d < 45) return `${Math.round(d)}日後`;
+  if (d < 365) return `${Math.round(d / 30.4)}ヶ月後`;
+  return `${(d / 365).toFixed(1)}年後`;
+}
+
+/* オリジナルドロップダウン */
+function ddSetup(id) {
+  const root = document.getElementById(id);
+  if (!root || root._setup) return;
+  root._setup = true;
+  root.querySelector('.dd-btn').onclick = (e) => {
+    e.stopPropagation();
+    const was = root.classList.contains('open');
+    closeDDs();
+    if (!was) { root.classList.add('open'); root.querySelector('.dd-list').hidden = false; }
+  };
+}
+function ddSet(id, { value, options, onPick }) {
+  const root = document.getElementById(id);
+  if (!root) return;
+  root._val = value;
+  root.querySelector('.dd-btn span').textContent = options.find((o) => o.v === value)?.t ?? '';
+  const list = root.querySelector('.dd-list');
+  list.innerHTML = options.map((o) =>
+    `<button type="button" data-v="${esc(o.v)}" class="${o.v === value ? 'on' : ''}">${o.v === value ? '✓ ' : ''}${esc(o.t)}</button>`).join('');
+  [...list.querySelectorAll('button')].forEach((b) => (b.onclick = (e) => {
+    e.stopPropagation();
+    onPick?.(b.dataset.v);
+  }));
+}
+function closeDDs() {
+  $$('.dd.open').forEach((r) => { r.classList.remove('open'); const l = r.querySelector('.dd-list'); if (l) l.hidden = true; });
+}
+
+/* オリジナルスイッチ */
+function swInit(id, on) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.dataset.on = on ? '1' : '';
+  el.classList.toggle('on', !!on);
+  el.setAttribute('aria-checked', !!on);
+  el.onclick = () => {
+    const v = !(el.dataset.on === '1');
+    el.dataset.on = v ? '1' : '';
+    el.classList.toggle('on', v);
+    el.setAttribute('aria-checked', v);
+  };
+}
+function swVal(id) { return document.getElementById(id)?.dataset.on === '1'; }
+
+/* 時刻ホイール */
+const WROW_H = 44, WHEEL_H = 132;
+function wheelBuild(id, min, max) {
+  const el = document.getElementById(id);
+  if (!el || el.dataset.built) return;
+  el.dataset.built = '1';
+  const pad = (WHEEL_H - WROW_H) / 2;
+  let h = `<div style="height:${pad}px;flex-shrink:0"></div>`;
+  for (let v = min; v <= max; v++) h += `<div class="wrow" data-v="${v}">${String(v).padStart(2, '0')}</div>`;
+  h += `<div style="height:${pad}px;flex-shrink:0"></div>`;
+  el.innerHTML = h;
+  el.addEventListener('scroll', () => wheelMark(el), { passive: true });
+}
+function wheelMark(el) {
+  const i = Math.round(el.scrollTop / WROW_H);
+  [...el.querySelectorAll('.wrow')].forEach((r, idx) => r.classList.toggle('sel', idx === i));
+}
+function wheelSet(id, v) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const rows = [...el.querySelectorAll('.wrow')];
+  const idx = rows.findIndex((r) => +r.dataset.v === v);
+  if (idx >= 0) { el.scrollTop = idx * WROW_H; wheelMark(el); }
+}
+function wheelGet(id) {
+  const el = document.getElementById(id);
+  const rows = [...el.querySelectorAll('.wrow')];
+  if (!rows.length) return 0;
+  return +rows[Math.min(rows.length - 1, Math.max(0, Math.round(el.scrollTop / WROW_H)))].dataset.v;
+}
+function wheelTime() {
+  return String(wheelGet('whHour')).padStart(2, '0') + ':' + String(wheelGet('whMin')).padStart(2, '0');
+}
 
 /* ---------- 例文ハイライト / 穴埋め ---------- */
 // nは1始まりの「何語目」。空白区切りトークン基準。
@@ -92,24 +306,29 @@ function toast(msg) {
 let deferredPrompt = null;
 function initInstall() {
   const btns = [$('#installBtn'), $('#installBtn2')].filter(Boolean);
+  const card = $('#installCard');
   const show = () => btns.forEach((b) => (b.hidden = false));
-  const hide = () => btns.forEach((b) => (b.hidden = true));
+  const hideAll = () => {
+    btns.forEach((b) => (b.hidden = true));
+    if (card) card.hidden = true; // インストール後は案内カードごと消す
+  };
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault(); deferredPrompt = e; show();
   });
-  window.addEventListener('appinstalled', () => { deferredPrompt = null; hide(); toast('インストールしました'); });
+  window.addEventListener('appinstalled', () => { deferredPrompt = null; hideAll(); toast('インストールしました'); });
   btns.forEach((b) => b.addEventListener('click', async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') hide();
+      if (outcome === 'accepted') hideAll();
       deferredPrompt = null;
     } else {
       const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
       toast(isiOS ? '共有 →「ホーム画面に追加」でアプリ化できます' : 'ブラウザメニューの「インストール/ホーム画面に追加」を使ってください');
     }
   }));
-  if (window.matchMedia('(display-mode: standalone)').matches) hide();
+  if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) hideAll();
+  else show(); // 未インストール時は案内を表示(ボタンは環境に応じた手順トースト付)
 }
 
 /* ---------- データ読込(CSVモジュール式) ---------- */
@@ -126,7 +345,13 @@ async function loadBundled() {
     const res = await fetch('./data/manifest.json', { cache: 'no-store' });
     if (!res.ok) throw new Error('manifest ' + res.status);
     const mani = await res.json();
+    Store.mem.deckGone ||= {};
     for (const d of mani.decks || []) {
+      if (Store.mem.deckGone[d.id]) { // ユーザーが削除した初期教材は復活させない
+        delete Store.mem.decks[d.id];
+        Object.keys(Store.mem.cards).forEach((k) => { if (Store.mem.cards[k].deckId === d.id) delete Store.mem.cards[k]; });
+        continue;
+      }
       Store.mem.decks[d.id] ||= { id: d.id, title: d.title, file: d.file, enabled: d.enabled !== false, custom: false };
       const deck = Store.mem.decks[d.id];
       deck.title = d.title || deck.title; deck.file = d.file || deck.file;
@@ -173,13 +398,15 @@ function modeFor(i) {
 function startSession() {
   const q = buildQueue();
   if (!q.length) { toast('今日の分は完了です。お疲れさまでした'); return; }
-  ses = { q, i: 0, done: 0, revealed: false };
+  ses = { q, i: 0, done: 0, revealed: false, last: null };
   showView('learn');
   renderCard();
 }
 function renderCard() {
   const box = $('#cardBox');
   const prog = $('#sesProg');
+  const un = $('#sesUndo');
+  if (un) un.disabled = !(ses && ses.last);
   if (!ses || ses.i >= ses.q.length) {
     box.innerHTML = `<div class="card"><h2>セッション完了</h2><p>お疲れさまでした。短時間でも毎日続けることが定着につながります。</p><div class="row"><button class="primary grow" id="backHome">ホームへ</button></div></div>`;
     prog.style.width = '100%';
@@ -190,59 +417,75 @@ function renderCard() {
   const c = ses.q[ses.i];
   const mode = modeFor(ses.i);
   prog.style.width = `${(ses.i / ses.q.length) * 100}%`;
-  $('#sesInfo').textContent = `${ses.i + 1} / ${ses.q.length} ・ ${modeName(mode)}`;
+  $('#sesInfo').textContent = `${ses.i + 1} / ${ses.q.length}`;
+  const mp = $('#sesMode');
+  mp.textContent = modeName(mode);
+  mp.className = 'modepill m-' + mode;
   ses.mode = mode; ses.revealed = false; ses.userOk = null;
+  // Anki式: 各ボタンに次回間隔を表示(履歴には影響しない仮計算)
+  const nowMs = Date.now();
+  const ivTxt = [0, 1, 2, 3].map((g) => fmtDue(SRS.gradeCard(Store.mem.progress[c.id], g, nowMs).due - nowMs));
 
-  const exBlock = (which, blank) => {
+  const sayBtn = (t, label, cls = '') => `<button class="saybtn ${cls}" data-say="${esc(t)}" title="${label}" aria-label="${label}">${IC.say}</button>`;
+  const cardMenu = `
+    <button class="cardmenu-btn" id="cardMenuBtn" aria-label="単語メニュー">…</button>
+    <div class="cardmenu" id="cardMenu" hidden>
+      <label class="f" for="cmMemo">メモ</label>
+      <textarea id="cmMemo" placeholder="覚え方など">${esc(Store.mem.overrides[c.id]?.memo || '')}</textarea>
+      <div class="row"><button class="small grow" id="cmSaveMemo">メモ保存</button></div>
+      <div class="row"><button class="small ghost grow" id="cmExclude">この単語を除外</button></div>
+    </div>`;
+  const exBlock = (which, blank, showJa = true) => {
     const sent = which === 1 ? c.ex1 : c.ex2;
     const ja = which === 1 ? c.ex1ja : c.ex2ja;
     const n = which === 1 ? c.ex1n : c.ex2n;
     if (!sent) return '';
-    return `<div class="ex"><div>${blank ? blankExample(sent, n) : highlightExample(sent, n)}</div><div class="ja">${esc(ja)}</div>
-      <div class="row" style="margin-top:6px"><button class="small ghost" data-say="${esc(sent)}">🔊 例文</button></div></div>`;
+    // 訳はタップで開く方式(答えバレ防止+片方だけ訳がない問題の解消)
+    return `<div class="ex"><div>${blank ? blankExample(sent, n) : highlightExample(sent, n)}</div>
+      ${showJa && ja ? `<button class="ja-toggle" data-ja>訳を見る</button><div class="ja" hidden>${esc(ja)}</div>` : ''}
+      <div class="center-row" style="margin-top:8px">${sayBtn(sent, '例文を聞く')}</div></div>`;
   };
+  const deckMeta = c.pos ? `<div class="center-row"><span class="pos">${esc(c.pos)}</span></div>` : '';
 
   if (mode === 'recog') {
     box.innerHTML = `
       <div class="card">
-        <span class="pos">${esc(c.pos || '')}</span>
-        <div class="word">${esc(c.word)}</div>
-        <div class="row"><button class="small" data-say="${esc(c.word)}">🔊 発音</button>
-        <span class="muted small">${esc(c.deckId)} #${esc(c.seq)}</span></div>
-        ${exBlock(1, false)}
+        ${cardMenu}
+        ${deckMeta}
+        <div class="wordwrap"><div class="word">${esc(c.word)}</div>${sayBtn(c.word, '発音を聞く', 'edge')}</div>
+        ${exBlock(1, false, false)}
         <div id="ans" hidden>
           <div class="meaning">${esc(effMeaning(c))}</div>
-          ${c.alt?.length ? `<div class="muted small">ほか: ${esc(c.alt.join(' / '))}</div>` : ''}
+          ${c.alt?.length ? `<div class="muted small" style="text-align:center">ほか: ${esc(c.alt.join(' / '))}</div>` : ''}
           ${exBlock(2, false)}
-          ${c.etym ? `<p class="small muted">語源: ${esc(c.etym)}</p>` : ''}
+          ${c.etym ? `<button class="small ghost etym-toggle" data-et>語源・由来を見る</button><div class="etym-body small muted" hidden>${esc(c.etym)}</div>` : ''}
         </div>
-        <div class="row" style="margin-top:10px"><button class="primary grow" id="reveal">意味を見る</button></div>
+        <div class="row" style="margin-top:12px"><button class="primary grow" id="reveal">意味を見る</button></div>
         <div class="grade" id="grades" hidden>
-          <button class="g0" data-g="0">忘れた<small>Again</small></button>
-          <button data-g="1">あいまい<small>Hard</small></button>
-          <button data-g="2">わかった<small>Good</small></button>
-          <button class="g3" data-g="3">余裕<small>Easy</small></button>
+          <button class="g0" data-g="0">忘れた<small>${ivTxt[0]}</small></button>
+          <button data-g="1">あいまい<small>${ivTxt[1]}</small></button>
+          <button data-g="2">わかった<small>${ivTxt[2]}</small></button>
+          <button class="g3" data-g="3">余裕<small>${ivTxt[3]}</small></button>
         </div>
       </div>`;
     $('#reveal').onclick = () => { $('#ans').hidden = false; $('#grades').hidden = false; $('#reveal').hidden = true; ses.revealed = true; setTimeout(() => $('#grades').scrollIntoView({ block: 'center', behavior: 'smooth' }), 60); };
   } else if (mode === 'recall') {
     box.innerHTML = `
       <div class="card">
-        <span class="pos">${esc(c.pos || '')}</span>
+        ${cardMenu}
+        ${deckMeta}
         <div class="meaning">${esc(effMeaning(c))}</div>
-        ${c.alt?.length ? `<div class="muted small">ほか: ${esc(c.alt.join(' / '))}</div>` : ''}
-        <label class="f" for="tin">英語スペルを入力</label>
-        <input type="text" id="tin" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="type the word">
+        ${c.alt?.length ? `<div class="muted small" style="text-align:center">ほか: ${esc(c.alt.join(' / '))}</div>` : ''}
+        <input type="text" id="tin" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="type the word" enterkeyhint="done" aria-label="英語スペル">
         <div class="row" style="margin-top:10px"><button class="primary grow" id="check">答え合わせ</button></div>
         <div id="ans" hidden>
-          <div class="word">${esc(c.word)}</div>
-          <div class="row"><button class="small" data-say="${esc(c.word)}">🔊 発音</button></div>
+          <div class="wordwrap"><div class="word">${esc(c.word)}</div>${sayBtn(c.word, '発音を聞く', 'edge')}</div>
           ${exBlock(1, false)}${exBlock(2, false)}
           <div id="judge" class="small"></div>
         </div>
         <div class="grade" id="grades" hidden>
-          <button class="g0" data-g="0">忘れた<small>Again</small></button><button data-g="1">あいまい<small>Hard</small></button>
-          <button data-g="2">わかった<small>Good</small></button><button class="g3" data-g="3">余裕<small>Easy</small></button>
+          <button class="g0" data-g="0">忘れた<small>${ivTxt[0]}</small></button><button data-g="1">あいまい<small>${ivTxt[1]}</small></button>
+          <button data-g="2">わかった<small>${ivTxt[2]}</small></button><button class="g3" data-g="3">余裕<small>${ivTxt[3]}</small></button>
         </div>
       </div>`;
     $('#check').onclick = () => {
@@ -258,20 +501,20 @@ function renderCard() {
     // cloze: 例文穴埋め (ハイライトと穴埋めの両対応: 出題時は伏せ、答え合わせ後はハイライト)
     box.innerHTML = `
       <div class="card">
+        ${cardMenu}
         <div class="ex"><div style="font-size:17px">${blankExample(c.ex1, c.ex1n)}</div><div class="ja">${esc(c.ex1ja)}</div></div>
-        <div class="muted">${esc(effMeaning(c))} <span class="pos">${esc(c.pos || '')}</span></div>
-        <label class="f" for="tin">空欄に入る単語は?</label>
-        <input type="text" id="tin" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="fill the blank">
+        <div class="muted" style="text-align:center">${esc(effMeaning(c))} <span class="pos">${esc(c.pos || '')}</span></div>
+        <input type="text" id="tin" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="fill the blank" enterkeyhint="done" aria-label="空欄に入る単語">
         <div class="row" style="margin-top:10px"><button class="primary grow" id="check">答え合わせ</button></div>
         <div id="ans" hidden>
-          <div class="ex"><div>${highlightExample(c.ex1, c.ex1n)}</div><div class="ja">${esc(c.ex1ja)}</div>
-          <div class="row" style="margin-top:6px"><button class="small ghost" data-say="${esc(c.ex1)}">🔊 例文</button></div></div>
+          <div class="wordwrap"><div class="word">${esc(c.word)}</div>${sayBtn(c.word, '発音を聞く', 'edge')}</div>
+          ${exBlock(1, false)}
           <div class="word">${esc(c.word)}</div>
           <div id="judge" class="small"></div>
         </div>
         <div class="grade" id="grades" hidden>
-          <button class="g0" data-g="0">忘れた<small>Again</small></button><button data-g="1">あいまい<small>Hard</small></button>
-          <button data-g="2">わかった<small>Good</small></button><button class="g3" data-g="3">余裕<small>Easy</small></button>
+          <button class="g0" data-g="0">忘れた<small>${ivTxt[0]}</small></button><button data-g="1">あいまい<small>${ivTxt[1]}</small></button>
+          <button data-g="2">わかった<small>${ivTxt[2]}</small></button><button class="g3" data-g="3">余裕<small>${ivTxt[3]}</small></button>
         </div>
       </div>`;
     $('#check').onclick = () => {
@@ -286,6 +529,45 @@ function renderCard() {
   }
   $$('#cardBox [data-say]').forEach((b) => (b.onclick = () => speak(b.dataset.say)));
   $$('#grades button').forEach((b) => (b.onclick = () => answer(parseInt(b.dataset.g, 10))));
+  $$('#cardBox [data-ja]').forEach((b) => (b.onclick = () => {
+    const j = b.parentElement.querySelector('.ja');
+    j.hidden = !j.hidden;
+    b.textContent = j.hidden ? '訳を見る' : '訳を閉じる';
+    b.classList.toggle('on', !j.hidden);
+  }));
+  const etb = $('#cardBox [data-et]');
+  if (etb) etb.onclick = () => {
+    const b = $('#cardBox .etym-body');
+    b.hidden = !b.hidden;
+    etb.textContent = b.hidden ? '語源・由来を見る' : '語源・由来を閉じる';
+  };
+  const tin = $('#tin');
+  if (tin) {
+    tin.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('#check')?.click(); } });
+    setTimeout(() => { try { tin.focus({ preventScroll: true }); } catch { tin.focus(); } }, 150);
+  }
+  const menuBtn = $('#cardMenuBtn'), menu = $('#cardMenu');
+  if (menuBtn && menu) {
+    menuBtn.onclick = (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; };
+    $('#cmSaveMemo').onclick = () => {
+      Store.mem.overrides[c.id] = { ...(Store.mem.overrides[c.id] || {}), memo: $('#cmMemo').value };
+      Store.save(); toast('メモを保存しました'); menu.hidden = true;
+    };
+    $('#cmExclude').onclick = async () => {
+      menu.hidden = true;
+      const ok = await askConfirm({
+        title: '単語を除外',
+        body: `「${c.word}」を学習対象から外します。一覧・詳細画面から戻せます。`,
+        okText: '除外する', danger: false,
+      });
+      if (!ok) return;
+      Store.mem.overrides[c.id] = { ...(Store.mem.overrides[c.id] || {}), excluded: true };
+      Store.save();
+      ses.q = ses.q.filter((x) => x.id !== c.id);
+      toast('除外しました');
+      renderCard(); renderHome(); renderStats();
+    };
+  }
 }
 function modeName(m) { return { recog: '認識', recall: '想起', cloze: '文脈穴埋め' }[m] || m; }
 
@@ -296,12 +578,30 @@ function answer(g) {
     if (ses.userOk && g === 0) { /* 明示操作を優先 */ }
   }
   if (ses.mode === 'recog' && !ses.revealed) return;
+  const prevSt = Store.mem.progress[c.id] ? { ...Store.mem.progress[c.id] } : null;
   Store.mem.progress[c.id] = SRS.gradeCard(Store.mem.progress[c.id], g);
   Store.mem.reviews.push({ t: Date.now(), cardId: c.id, grade: g });
   const k = Store.todayKey();
   Store.mem.activity[k] = (Store.mem.activity[k] || 0) + 1;
   Store.save();
+  ses.last = { cardId: c.id, prev: prevSt, day: k };
   ses.i++; ses.done++;
+  renderCard(); renderHome(); renderStats();
+}
+
+/* 直前の採点を1手だけ取り消す(AnkiのUndo相当) */
+function undoLast() {
+  if (!ses || !ses.last) return;
+  const { cardId, prev, day } = ses.last;
+  if (prev) Store.mem.progress[cardId] = prev;
+  else delete Store.mem.progress[cardId];
+  Store.mem.reviews.pop();
+  if (Store.mem.activity[day] > 1) Store.mem.activity[day]--;
+  else delete Store.mem.activity[day];
+  Store.save();
+  ses.last = null;
+  ses.i = Math.max(0, ses.i - 1);
+  toast('直前の採点を取り消しました');
   renderCard(); renderHome(); renderStats();
 }
 
@@ -354,25 +654,32 @@ function renderHome() {
 }
 
 /* ---------- 一覧・検索・詳細 ---------- */
+let listDeckF = '', listStF = '';
+const ST_OPTS = [
+  { v: '', t: '全状態' }, { v: 'new', t: '未学習' }, { v: 'due', t: '復習期' }, { v: 'mature', t: '定着' },
+];
 function renderList() {
   const kw = ($('#q').value || '').toLowerCase();
-  const deckF = $('#deckFilter').value;
-  const stF = $('#stFilter').value;
+  const deckF = listDeckF, stF = listStF;
   const now = Date.now();
+  const deckOpts = [{ v: '', t: '全教材' }].concat(
+    Object.values(Store.mem.decks).filter((d) => d.enabled).map((d) => ({ v: d.id, t: d.title }))
+  );
+  if (!deckOpts.some((o) => o.v === deckF)) listDeckF = '';
+  ddSet('ddDeck', { value: listDeckF, options: deckOpts, onPick: (v) => { listDeckF = v; renderList(); } });
+  ddSet('ddState', { value: listStF, options: ST_OPTS, onPick: (v) => { listStF = v; renderList(); } });
   const cards = visibleCards()
     .filter((c) => !kw || c.word.toLowerCase().includes(kw) || effMeaning(c).includes(kw) || (c.alt || []).join(' ').includes(kw))
-    .filter((c) => !deckF || c.deckId === deckF)
+    .filter((c) => !listDeckF || c.deckId === listDeckF)
     .filter((c) => {
-      if (!stF) return true;
+      if (!listStF) return true;
       const p = Store.mem.progress[c.id];
-      if (stF === 'new') return !p;
-      if (stF === 'due') return p && p.due <= now;
-      if (stF === 'mature') return p && p.interval >= 21 && p.due > now;
+      if (listStF === 'new') return !p;
+      if (listStF === 'due') return p && p.due <= now;
+      if (listStF === 'mature') return p && p.interval >= 21 && p.due > now;
       return true;
     })
     .slice(0, 300);
-  $('#deckFilter').innerHTML = '<option value="">全教材</option>' + Object.values(Store.mem.decks).filter((d) => d.enabled)
-    .map((d) => `<option value="${esc(d.id)}" ${d.id === deckF ? 'selected' : ''}>${esc(d.title)}</option>`).join('');
   $('#listCount').textContent = `${cards.length}件${visibleCards().length > 300 ? '(先頭300件)' : ''}`;
   $('#listBox').innerHTML = cards.map((c) => {
     const p = Store.mem.progress[c.id];
@@ -398,13 +705,13 @@ function openDetail(id) {
     if (!sent) return '';
     return `<div class="ex" data-ex="${w}"><div>${showBlank ? blankExample(sent, n) : highlightExample(sent, n)}</div>
       <div class="ja">${esc(ja)}</div>
-      <div class="row" style="margin-top:6px"><button class="small ghost" data-say="${esc(sent)}">🔊 例文</button>
+      <div class="center-row" style="margin-top:8px"><button class="saybtn" data-say="${esc(sent)}" title="例文を聞く" aria-label="例文を聞く">${IC.say}</button>
       <span class="muted small">${n ? `目標語は${n}語目` : ''}</span></div></div>`;
   }).join('');
   $('#detailBody').innerHTML = `
     <div class="row"><span class="pos">${esc(c.pos || '')}</span><span class="muted small">${esc(c.deckId)} #${esc(c.seq)}</span></div>
     <div class="word">${esc(c.word)}</div>
-    <div class="row"><button class="small" id="sayW">🔊 発音</button>
+    <div class="center-row"><button class="saybtn" id="sayW" title="発音を聞く" aria-label="発音を聞く">${IC.say}</button>
       <span class="pill">${p ? `間隔${p.interval}日・次回${new Date(p.due).toLocaleDateString('ja-JP')}` : '未学習'}</span></div>
     <label class="f">訳</label><div class="meaning">${esc(effMeaning(c))}</div>
     ${c.alt?.length ? `<div class="muted small">ほか: ${esc(c.alt.join(' / '))}</div>` : ''}
@@ -461,7 +768,7 @@ function renderStats() {
   renderGrass();
 }
 
-/* 草(学習記録カレンダー): 直近17週をGitHub風ヒートマップで */
+/* 草(学習記録カレンダー): GitHub風フル再現(月・曜日ラベル+タップ詳細) */
 function renderGrass() {
   const box = $('#grass');
   if (!box) return;
@@ -469,24 +776,48 @@ function renderGrass() {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const start = new Date(today); start.setDate(start.getDate() - (WEEKS * 7 - 1));
   start.setDate(start.getDate() - start.getDay()); // 直前の日曜に揃える
-  const cells = [];
+  const cols = [];
   let total = 0, max = 1;
-  for (let i = 0; i < WEEKS * 7; i++) {
-    const d = new Date(start); d.setDate(d.getDate() + i);
-    if (d > today) { cells.push(null); continue; }
-    const v = Store.mem.activity[Store.todayKey(d)] || 0;
-    cells.push({ d, v });
-    total += v; max = Math.max(max, v);
+  for (let w = 0; w < WEEKS; w++) {
+    const col = [];
+    for (let d = 0; d < 7; d++) {
+      const dt = new Date(start); dt.setDate(dt.getDate() + w * 7 + d);
+      if (dt > today) { col.push(null); continue; }
+      const v = Store.mem.activity[Store.todayKey(dt)] || 0;
+      col.push({ dt, v });
+      total += v; max = Math.max(max, v);
+    }
+    cols.push(col);
   }
-  box.innerHTML = cells.map((c) => {
+  const lv = (v) => (v === 0 ? '' : 'lv' + Math.min(4, Math.ceil((v / max) * 4)));
+  box.innerHTML = cols.map((col) => col.map((c) => {
     if (!c) return '<i class="none"></i>';
-    const lv = c.v === 0 ? '' : 'lv' + Math.min(4, Math.ceil((c.v / max) * 4));
-    const label = `${c.d.getMonth() + 1}/${c.d.getDate()}: ${c.v}語`;
-    return `<i class="${lv}" title="${label}"></i>`;
+    return `<i data-d="${Store.todayKey(c.dt)}" class="${lv(c.v)}"></i>`;
+  }).join('')).join('');
+  const M = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+  let lastM = -1;
+  $('#grassMonths').innerHTML = cols.map((col) => {
+    const first = col.find((c) => c);
+    if (!first) return '<span></span>';
+    const m = first.dt.getMonth();
+    if (m === lastM) return '<span></span>';
+    lastM = m;
+    return `<span>${M[m]}</span>`;
   }).join('');
   $('#grassTotal').textContent = `${total}語`;
   const d0 = new Date(today); d0.setDate(d0.getDate() - (WEEKS * 7 - 1));
   $('#grassRange').textContent = `過去${WEEKS}週(${d0.getMonth() + 1}/${d0.getDate()}〜)の学習量`;
+}
+
+function onGrassTap(e) {
+  const cell = e.target.closest('i[data-d]');
+  if (!cell) return;
+  const [y, mo, da] = cell.dataset.d.split('-').map(Number);
+  const dt = new Date(y, mo - 1, da);
+  const wd = ['日', '月', '火', '水', '木', '金', '土'][dt.getDay()];
+  const st = dayStats(cell.dataset.d);
+  const acc = st.total ? `・正答率${Math.round((st.good / st.total) * 100)}%` : '';
+  showPopover(cell, `<b>${mo}/${da}(${wd})</b><br>${st.n}語学習${acc}<br><span class="muted">${st.total}件の採点</span>`);
 }
 
 /* ---------- 設定・教材管理 ---------- */
@@ -494,32 +825,66 @@ function renderSettings() {
   const s = Store.mem.settings;
   $('#setGoal').value = s.dailyGoal; $('#setNew').value = s.newPerDay;
   segInit('segMode', s.mode); segInit('segEx', s.exDisplay);
-  $('#setTime').value = s.remindTime || '';
-  $('#setNotify').checked = !!s.notifyOn;
+  swInit('swNotify', !!s.notifyOn);
+  const curAcc = (s.accent || '#5bb88a').toLowerCase();
+  $$('#swAcc button').forEach((b) => {
+    b.classList.toggle('on', b.dataset.c.toLowerCase() === curAcc);
+    b.onclick = () => {
+      Store.mem.settings.accent = b.dataset.c;
+      applyAccent();
+      Store.save();
+      $$('#swAcc button').forEach((x) => x.classList.toggle('on', x === b));
+    };
+  });
+  const [hh, mm] = (s.remindTime || '07:00').split(':').map(Number);
+  wheelSet('whHour', Number.isFinite(hh) ? hh : 7);
+  wheelSet('whMin', Number.isFinite(mm) ? mm : 0);
   updateNotifyState();
+  const gone = Object.keys(Store.mem.deckGone || {});
   const decks = Object.values(Store.mem.decks);
-  $('#deckBox').innerHTML = decks.map((d) => `
+  const restore = gone.length
+    ? `<div class="restore-row"><button class="small ghost" id="restoreDecks">初期教材を復元(${gone.length}件)</button></div>` : '';
+  $('#deckBox').innerHTML = restore + (decks.map((d) => `
     <div class="card"><div class="row"><strong>${esc(d.title)}</strong><span class="grow"></span>
       <span class="pill">${d.enabled ? '有効' : '無効'}</span></div>
     <div class="muted small">${esc(d.id)} ・ ${d.custom ? '取込教材' : esc(d.file || '')} ・ ${d.count ?? Object.values(Store.mem.cards).filter((c) => c.deckId === d.id).length}語</div>
-    <div class="row" style="margin-top:8px">
+    <div class="deckops">
       <button class="iconbtn ${d.enabled ? '' : 'off'}" data-act="toggle" data-id="${esc(d.id)}" title="${d.enabled ? '無効にする' : '有効にする'}" aria-label="${d.enabled ? '無効にする' : '有効にする'}">${d.enabled ? IC.eye : IC.eyeOff}</button>
+      <span class="grow"></span>
       <button class="iconbtn" data-act="export" data-id="${esc(d.id)}" title="CSVで書き出す" aria-label="CSVで書き出す">${IC.download}</button>
-      <button class="iconbtn danger" data-act="del" data-id="${esc(d.id)}" title="${d.custom ? '削除する' : '非表示にする'}" aria-label="${d.custom ? '削除する' : '非表示にする'}">${IC.trash}</button>
-    </div></div>`).join('') || '<p class="muted">教材がありません。CSVを取り込んでください。</p>';
-  $$('#deckBox button').forEach((b) => (b.onclick = () => deckAction(b.dataset.act, b.dataset.id)));
+      <button class="iconbtn danger" data-act="del" data-id="${esc(d.id)}" title="削除する" aria-label="削除する">${IC.trash}</button>
+    </div></div>`).join('') || '<p class="muted">教材がありません。CSVを取り込むか初期教材を復元してください。</p>');
+  $$('#deckBox button').forEach((b) => {
+    if (b.id === 'restoreDecks') { b.onclick = restoreBundled; return; }
+    b.onclick = () => deckAction(b.dataset.act, b.dataset.id);
+  });
 }
 
-function deckAction(act, id) {
+function restoreBundled() {
+  Store.mem.deckGone = {};
+  Store.saveNow();
+  location.reload();
+}
+
+async function deckAction(act, id) {
   const d = Store.mem.decks[id];
   if (!d) return;
   if (act === 'toggle') { d.enabled = !d.enabled; Store.save(); renderSettings(); renderHome(); }
   if (act === 'del') {
-    if (d.custom) {
-      Object.keys(Store.mem.cards).forEach((k) => { if (Store.mem.cards[k].deckId === id) delete Store.mem.cards[k]; });
-      delete Store.mem.decks[id];
-    } else d.enabled = false;
-    Store.save(); renderSettings(); renderHome(); renderList(); toast('教材を無効化/削除しました');
+    const n = Object.values(Store.mem.cards).filter((c) => c.deckId === id).length;
+    const ok = await askConfirm({
+      title: '教材を削除',
+      body: `「${d.title}」(${n}語)を端末から削除します。${d.custom ? '' : '初期教材も完全に消去されます(「初期教材を復元」から戻せます)。'}この操作は取り消せません。`,
+      okText: '削除する', danger: true,
+    });
+    if (!ok) return;
+    const ids = new Set(Object.values(Store.mem.cards).filter((c) => c.deckId === id).map((c) => c.id));
+    Object.keys(Store.mem.cards).forEach((k) => { if (Store.mem.cards[k].deckId === id) delete Store.mem.cards[k]; });
+    ids.forEach((cid) => { delete Store.mem.progress[cid]; delete Store.mem.overrides[cid]; });
+    Store.mem.reviews = Store.mem.reviews.filter((r) => !ids.has(r.cardId));
+    if (!d.custom) { Store.mem.deckGone ||= {}; Store.mem.deckGone[id] = 1; }
+    delete Store.mem.decks[id];
+    Store.save(); renderSettings(); renderHome(); renderList(); toast('教材を削除しました');
   }
   if (act === 'export') {
     const cards = Object.values(Store.mem.cards).filter((c) => c.deckId === id)
@@ -554,8 +919,13 @@ function scheduleNotify() {
   const [h, m] = s.remindTime.split(':').map(Number);
   const next = new Date(); next.setHours(h, m, 0, 0);
   if (next <= new Date()) next.setDate(next.getDate() + 1);
-  notifyTimer = setTimeout(() => {
-    try { new Notification('lemon', { body: `今日の${s.dailyGoal}語、2分だけやりませんか?`, icon: './icons/icon-192.png' }); } catch { /* 権限なし */ }
+  notifyTimer = setTimeout(async () => {
+    // その日にやることがあるときだけ通知(静かな習慣化)
+    try {
+      if (buildQueue().length) {
+        await fireNotification('lemon', `今日の${Store.mem.settings.dailyGoal}語、2分だけやりませんか?`);
+      }
+    } catch { /* 権限なし */ }
     scheduleNotify();
   }, next - Date.now());
 }
@@ -578,18 +948,23 @@ async function testNotify() {
     toast('通知が許可されていません。端末の設定から許可してください');
     return;
   }
-  try {
-    new Notification('lemon テスト通知', {
-      body: '通知は正常です。リマインドもこの表示で届きます(アプリを開いている間のみ有効)。',
-      icon: './icons/icon-192.png',
-    });
-    toast('テスト通知を送信しました');
-  } catch { toast('通知の表示に失敗しました'); }
+  const sent = await fireNotification(
+    'lemon テスト通知',
+    '通知は正常です。リマインドもこの表示で届きます(アプリを開いている間のみ有効)。'
+  );
+  toast(sent ? 'テスト通知を送信しました' : '通知の表示に失敗しました');
 }
 
 /* ---------- 起動 ---------- */
 async function boot() {
   initInstall();
+  applyAccent();
+  if (window.matchMedia) {
+    const mq = window.matchMedia('(prefers-color-scheme: light)');
+    const onScheme = () => applyAccent();
+    if (mq.addEventListener) mq.addEventListener('change', onScheme);
+    else if (mq.addListener) mq.addListener(onScheme);
+  }
   if ('serviceWorker' in navigator) {
     try { await navigator.serviceWorker.register('./sw.js'); } catch (e) { console.warn('SW登録失敗', e); }
   }
@@ -598,42 +973,62 @@ async function boot() {
   $('#btnGoList').onclick = () => showView('list');
   $('#btnGoDecks').onclick = () => showView('settings');
   $('#q').addEventListener('input', renderList);
-  $('#deckFilter').addEventListener('change', renderList);
-  $('#stFilter').addEventListener('change', renderList);
+  ddSetup('ddDeck'); ddSetup('ddState');
+  wheelBuild('whHour', 0, 23); wheelBuild('whMin', 0, 59);
+  $$('#wPresets button').forEach((b) => (b.onclick = () => {
+    const [h, m] = b.dataset.t.split(':').map(Number);
+    wheelSet('whHour', h); wheelSet('whMin', m);
+  }));
+  $('#sesQuit').onclick = () => { ses = null; showView('home'); toast('セッションを終了しました'); };
+  $('#sesUndo').onclick = undoLast;
+  $('#grass').addEventListener('click', onGrassTap);
+  window.addEventListener('scroll', hidePopover, { passive: true, capture: true });
   $('#saveSettings').onclick = async () => {
     Store.mem.settings.dailyGoal = Math.max(1, +$('#setGoal').value || 5);
     Store.mem.settings.newPerDay = Math.max(1, +$('#setNew').value || 5);
     Store.mem.settings.mode = segVal('segMode') || 'mix';
     Store.mem.settings.exDisplay = segVal('segEx') || 'highlight';
-    Store.mem.settings.remindTime = $('#setTime').value;
-    Store.mem.settings.notifyOn = $('#setNotify').checked;
+    Store.mem.settings.remindTime = wheelTime();
+    Store.mem.settings.notifyOn = swVal('swNotify');
     if (Store.mem.settings.notifyOn && 'Notification' in window) {
       const p = await Notification.requestPermission();
       if (p !== 'granted') { Store.mem.settings.notifyOn = false; toast('通知が許可されませんでした'); }
     }
     Store.save(); scheduleNotify(); renderHome();
-    $('#setNotify').checked = Store.mem.settings.notifyOn;
+    swInit('swNotify', Store.mem.settings.notifyOn);
     updateNotifyState();
     toast('設定を保存しました');
   };
   $('#csvFile').addEventListener('change', (e) => { if (e.target.files[0]) importFile(e.target.files[0]); e.target.value = ''; });
   $('#testNotify').onclick = testNotify;
-  // はてなヘルプ: タップで開閉(ホバーはCSS)、他所タップで閉じる
+  // はてなヘルプ: タップで開閉(ホバーはCSS)、他所タップで閉じる。端切れ補正つき
   document.addEventListener('click', (e) => {
+    if (!e.target.closest('.dd')) closeDDs();
+    const cm = $('#cardMenu');
+    if (cm && !cm.hidden && !e.target.closest('#cardMenu,#cardMenuBtn')) cm.hidden = true;
+    if (popEl && !e.target.closest('.gpop') && !e.target.closest('#grass')) hidePopover();
     const h = e.target.closest('.help');
     if (h) {
       const w = h.closest('.helpwrap');
       const was = w.classList.contains('open');
-      $$('.helpwrap.open').forEach((x) => x.classList.remove('open'));
-      if (!was) w.classList.add('open');
+      closeHelps();
+      if (!was) { w.classList.add('open'); fitBubble(w); }
       return;
     }
-    if (!e.target.closest('.helpwrap')) $$('.helpwrap.open').forEach((x) => x.classList.remove('open'));
+    if (!e.target.closest('.helpwrap')) closeHelps();
   });
   $('#closeDetail').onclick = () => $('#detail').close();
-  $('#resetAll').onclick = () => {
-    if (!confirm('学習履歴・設定をすべて消去しますか?')) return;
-    localStorage.removeItem(window.EtanStore.KEY);
+  $('#resetAll').onclick = async () => {
+    const nCards = Object.keys(Store.mem.cards).length;
+    const nRev = Store.mem.reviews.length;
+    const nDays = Object.keys(Store.mem.activity).length;
+    const ok = await askConfirm({
+      title: '学習履歴を全消去',
+      body: `登録 ${nCards}語・回答履歴 ${nRev}件・学習記録 ${nDays}日分をすべて消去します。取込教材も消え、初期状態に戻ります。この操作は取り消せません。`,
+      okText: 'すべて消去する', danger: true,
+    });
+    if (!ok) return;
+    localStorage.removeItem(Store.KEY);
     location.reload();
   };
   renderHome(); renderStats(); scheduleNotify();
