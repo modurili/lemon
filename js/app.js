@@ -1,8 +1,8 @@
 /* 英単語ドリル app.js — バニラJS。GitHub Pages静的ホスティング想定(相対パスのみ) */
 'use strict';
-const { mem, save, saveNow, todayKey } = window.EtanStore;
-const { parseCSV, rowsToCards, cardsToCSV } = window.EtanCSV;
-const { gradeCard, statusOf } = window.EtanSRS;
+const Store = window.EtanStore;
+const CSV = window.EtanCSV;
+const SRS = window.EtanSRS;
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -86,10 +86,10 @@ function initInstall() {
 /* ---------- データ読込(CSVモジュール式) ---------- */
 async function loadBundled() {
   // カスタム教材(前回取込)を先に復元
-  for (const [id, d] of Object.entries(mem.decks)) {
+  for (const [id, d] of Object.entries(Store.mem.decks)) {
     if (d.custom && d.csvText) {
-      const { cards, errors } = rowsToCards(parseCSV(d.csvText), id);
-      cards.forEach((c) => (mem.cards[c.id] = c));
+      const { cards, errors } = CSV.rowsToCards(CSV.parseCSV(d.csvText), id);
+      cards.forEach((c) => (Store.mem.cards[c.id] = c));
       if (errors.length) console.warn(id, errors);
     }
   }
@@ -98,8 +98,8 @@ async function loadBundled() {
     if (!res.ok) throw new Error('manifest ' + res.status);
     const mani = await res.json();
     for (const d of mani.decks || []) {
-      mem.decks[d.id] ||= { id: d.id, title: d.title, file: d.file, enabled: d.enabled !== false, custom: false };
-      const deck = mem.decks[d.id];
+      Store.mem.decks[d.id] ||= { id: d.id, title: d.title, file: d.file, enabled: d.enabled !== false, custom: false };
+      const deck = Store.mem.decks[d.id];
       deck.title = d.title || deck.title; deck.file = d.file || deck.file;
       if (deck.enabled === undefined) deck.enabled = true;
       if (!deck.enabled) continue;
@@ -107,10 +107,10 @@ async function loadBundled() {
         const r = await fetch('./' + d.file.replace(/^\.\//, ''), { cache: 'no-store' });
         if (!r.ok) throw new Error('csv ' + r.status);
         const text = await r.text();
-        const { cards, errors } = rowsToCards(parseCSV(text), d.id);
+        const { cards, errors } = CSV.rowsToCards(CSV.parseCSV(text), d.id);
         // 同deckの古いカードを入れ替え
-        Object.keys(mem.cards).forEach((k) => { if (mem.cards[k].deckId === d.id) delete mem.cards[k]; });
-        cards.forEach((c) => (mem.cards[c.id] = c));
+        Object.keys(Store.mem.cards).forEach((k) => { if (Store.mem.cards[k].deckId === d.id) delete Store.mem.cards[k]; });
+        cards.forEach((c) => (Store.mem.cards[c.id] = c));
         deck.count = cards.length;
         if (errors.length) console.warn(d.id, errors);
       } catch (e) { console.warn('deck load failed', d.id, e); }
@@ -118,26 +118,26 @@ async function loadBundled() {
   } catch (e) {
     console.warn('bundled manifest load failed (file://直開きの可能性):', e);
   }
-  save();
+  Store.save();
 }
 
-const visibleCards = () => Object.values(mem.cards).filter((c) => mem.decks[c.deckId]?.enabled && !mem.overrides[c.id]?.excluded);
-const effMeaning = (c) => mem.overrides[c.id]?.meaning || c.meaning;
+const visibleCards = () => Object.values(Store.mem.cards).filter((c) => Store.mem.decks[c.deckId]?.enabled && !Store.mem.overrides[c.id]?.excluded);
+const effMeaning = (c) => Store.mem.overrides[c.id]?.meaning || c.meaning;
 
 /* ---------- 今日キュー ---------- */
 function buildQueue() {
   const now = Date.now();
   const cards = visibleCards();
-  const due = cards.filter((c) => { const p = mem.progress[c.id]; return p && p.due <= now; })
-    .sort((a, b) => mem.progress[a.id].due - mem.progress[b.id].due);
-  const fresh = cards.filter((c) => !mem.progress[c.id]).slice(0, mem.settings.newPerDay);
+  const due = cards.filter((c) => { const p = Store.mem.progress[c.id]; return p && p.due <= now; })
+    .sort((a, b) => Store.mem.progress[a.id].due - Store.mem.progress[b.id].due);
+  const fresh = cards.filter((c) => !Store.mem.progress[c.id]).slice(0, Store.mem.settings.newPerDay);
   return [...due, ...fresh].slice(0, 60);
 }
 
 /* ---------- セッション ---------- */
 let ses = null;
 function modeFor(i) {
-  const m = mem.settings.mode;
+  const m = Store.mem.settings.mode;
   if (m !== 'mix') return m;
   return ['recog', 'recall', 'cloze'][i % 3];
 }
@@ -189,13 +189,13 @@ function renderCard() {
         </div>
         <div class="row" style="margin-top:10px"><button class="primary grow" id="reveal">意味を見る</button></div>
         <div class="grade" id="grades" hidden>
-          <button class="g0" data-g="0">Again<br><small>忘れた</small></button>
-          <button data-g="1">Hard<br><small>あいまい</small></button>
-          <button data-g="2">Good<br><small>わかった</small></button>
-          <button class="g3" data-g="3">Easy<br><small>余裕</small></button>
+          <button class="g0" data-g="0">忘れた<small>Again</small></button>
+          <button data-g="1">あいまい<small>Hard</small></button>
+          <button data-g="2">わかった<small>Good</small></button>
+          <button class="g3" data-g="3">余裕<small>Easy</small></button>
         </div>
       </div>`;
-    $('#reveal').onclick = () => { $('#ans').hidden = false; $('#grades').hidden = false; $('#reveal').hidden = true; ses.revealed = true; };
+    $('#reveal').onclick = () => { $('#ans').hidden = false; $('#grades').hidden = false; $('#reveal').hidden = true; ses.revealed = true; setTimeout(() => $('#grades').scrollIntoView({ block: 'center', behavior: 'smooth' }), 60); };
   } else if (mode === 'recall') {
     box.innerHTML = `
       <div class="card">
@@ -212,8 +212,8 @@ function renderCard() {
           <div id="judge" class="small"></div>
         </div>
         <div class="grade" id="grades" hidden>
-          <button class="g0" data-g="0">Again</button><button data-g="1">Hard</button>
-          <button data-g="2">Good</button><button class="g3" data-g="3">Easy</button>
+          <button class="g0" data-g="0">忘れた<small>Again</small></button><button data-g="1">あいまい<small>Hard</small></button>
+          <button data-g="2">わかった<small>Good</small></button><button class="g3" data-g="3">余裕<small>Easy</small></button>
         </div>
       </div>`;
     $('#check').onclick = () => {
@@ -223,6 +223,7 @@ function renderCard() {
       $('#ans').hidden = false; $('#grades').hidden = false;
       $('#judge').innerHTML = ok ? '<span class="ok">正解です</span>' : `<span class="ng">不正解</span> <span class="muted">正: ${esc(c.word)}</span>`;
       $('#check').hidden = true;
+      setTimeout(() => $('#grades').scrollIntoView({ block: 'center', behavior: 'smooth' }), 60);
     };
   } else {
     // cloze: 例文穴埋め (ハイライトと穴埋めの両対応: 出題時は伏せ、答え合わせ後はハイライト)
@@ -240,8 +241,8 @@ function renderCard() {
           <div id="judge" class="small"></div>
         </div>
         <div class="grade" id="grades" hidden>
-          <button class="g0" data-g="0">Again</button><button data-g="1">Hard</button>
-          <button data-g="2">Good</button><button class="g3" data-g="3">Easy</button>
+          <button class="g0" data-g="0">忘れた<small>Again</small></button><button data-g="1">あいまい<small>Hard</small></button>
+          <button data-g="2">わかった<small>Good</small></button><button class="g3" data-g="3">余裕<small>Easy</small></button>
         </div>
       </div>`;
     $('#check').onclick = () => {
@@ -251,6 +252,7 @@ function renderCard() {
       $('#ans').hidden = false; $('#grades').hidden = false;
       $('#judge').innerHTML = ok ? '<span class="ok">正解です</span>' : `<span class="ng">不正解</span> <span class="muted">正: ${esc(c.word)}</span>`;
       $('#check').hidden = true;
+      setTimeout(() => $('#grades').scrollIntoView({ block: 'center', behavior: 'smooth' }), 60);
     };
   }
   $$('#cardBox [data-say]').forEach((b) => (b.onclick = () => speak(b.dataset.say)));
@@ -265,11 +267,11 @@ function answer(g) {
     if (ses.userOk && g === 0) { /* 明示操作を優先 */ }
   }
   if (ses.mode === 'recog' && !ses.revealed) return;
-  mem.progress[c.id] = gradeCard(mem.progress[c.id], g);
-  mem.reviews.push({ t: Date.now(), cardId: c.id, grade: g });
-  const k = todayKey();
-  mem.activity[k] = (mem.activity[k] || 0) + 1;
-  save();
+  Store.mem.progress[c.id] = SRS.gradeCard(Store.mem.progress[c.id], g);
+  Store.mem.reviews.push({ t: Date.now(), cardId: c.id, grade: g });
+  const k = Store.todayKey();
+  Store.mem.activity[k] = (Store.mem.activity[k] || 0) + 1;
+  Store.save();
   ses.i++; ses.done++;
   renderCard(); renderHome(); renderStats();
 }
@@ -290,8 +292,8 @@ function streak() {
   let s = 0, gaps = 0;
   for (let back = 0; back < 365; back++) {
     const d = new Date(); d.setDate(d.getDate() - back);
-    const k = todayKey(d);
-    if (mem.activity[k]) s++;
+    const k = Store.todayKey(d);
+    if (Store.mem.activity[k]) s++;
     else if (back === 0) continue; // 今日未実施は継続扱い
     else if (gaps < 1) gaps++; // 1日のお休みは許容(寛容型ストリーク)
     else break;
@@ -300,10 +302,10 @@ function streak() {
 }
 function renderHome() {
   const q = buildQueue();
-  const dueN = q.filter((c) => mem.progress[c.id]).length;
-  const newN = q.filter((c) => !mem.progress[c.id]).length;
-  const today = mem.activity[todayKey()] || 0;
-  const goal = mem.settings.dailyGoal || 5;
+  const dueN = q.filter((c) => Store.mem.progress[c.id]).length;
+  const newN = q.filter((c) => !Store.mem.progress[c.id]).length;
+  const today = Store.mem.activity[Store.todayKey()] || 0;
+  const goal = Store.mem.settings.dailyGoal || 5;
   const pct = Math.min(100, Math.round((today / goal) * 100));
   const total = visibleCards().length;
   $('#qDue').textContent = dueN;
@@ -311,12 +313,12 @@ function renderHome() {
   $('#todayBar').style.width = pct + '%';
   $('#todayTxt').textContent = `${today} / ${goal} 語 (${pct}%)`;
   $('#streakTxt').textContent = `${streak()}日継続中(1日休みOK)`;
-  $('#totalTxt').textContent = `登録 ${total}語 ・ 教材 ${Object.values(mem.decks).filter((d) => d.enabled).length}件`;
+  $('#totalTxt').textContent = `登録 ${total}語 ・ 教材 ${Object.values(Store.mem.decks).filter((d) => d.enabled).length}件`;
   // 週ドット
   const week = [];
   for (let back = 6; back >= 0; back--) {
     const d = new Date(); d.setDate(d.getDate() - back);
-    week.push(`<span class="dot ${mem.activity[todayKey(d)] ? 'hit' : ''}"></span>`);
+    week.push(`<span class="dot ${Store.mem.activity[Store.todayKey(d)] ? 'hit' : ''}"></span>`);
   }
   $('#weekDots').innerHTML = week.join('');
   $('#startBtn').onclick = startSession;
@@ -333,19 +335,19 @@ function renderList() {
     .filter((c) => !deckF || c.deckId === deckF)
     .filter((c) => {
       if (!stF) return true;
-      const p = mem.progress[c.id];
+      const p = Store.mem.progress[c.id];
       if (stF === 'new') return !p;
       if (stF === 'due') return p && p.due <= now;
       if (stF === 'mature') return p && p.interval >= 21 && p.due > now;
       return true;
     })
     .slice(0, 300);
-  $('#deckFilter').innerHTML = '<option value="">全教材</option>' + Object.values(mem.decks).filter((d) => d.enabled)
+  $('#deckFilter').innerHTML = '<option value="">全教材</option>' + Object.values(Store.mem.decks).filter((d) => d.enabled)
     .map((d) => `<option value="${esc(d.id)}" ${d.id === deckF ? 'selected' : ''}>${esc(d.title)}</option>`).join('');
   $('#listCount').textContent = `${cards.length}件${visibleCards().length > 300 ? '(先頭300件)' : ''}`;
   $('#listBox').innerHTML = cards.map((c) => {
-    const p = mem.progress[c.id];
-    const st = statusOf(p);
+    const p = Store.mem.progress[c.id];
+    const st = SRS.statusOf(p);
     const pill = { new: '未学習', due: '復習期', relearn: '再学習', young: '学習中', mature: '定着' }[st];
     return `<div class="card" data-id="${esc(c.id)}" style="cursor:pointer">
       <div class="row"><strong>${esc(c.word)}</strong><span class="pos">${esc(c.pos || '')}</span>
@@ -356,12 +358,12 @@ function renderList() {
 }
 
 function openDetail(id) {
-  const c = mem.cards[id];
+  const c = Store.mem.cards[id];
   if (!c) return;
-  const ov = mem.overrides[id] || {};
-  const p = mem.progress[id];
+  const ov = Store.mem.overrides[id] || {};
+  const p = Store.mem.progress[id];
   const dlg = $('#detail');
-  const showBlank = mem.settings.exDisplay === 'blank';
+  const showBlank = Store.mem.settings.exDisplay === 'blank';
   const exHtml = [1, 2].map((w) => {
     const sent = w === 1 ? c.ex1 : c.ex2, ja = w === 1 ? c.ex1ja : c.ex2ja, n = w === 1 ? c.ex1n : c.ex2n;
     if (!sent) return '';
@@ -403,12 +405,12 @@ function openDetail(id) {
     });
   };
   $('#saveMemo').onclick = () => {
-    mem.overrides[id] = { ...(mem.overrides[id] || {}), memo: $('#memo').value };
-    save(); toast('メモを保存しました');
+    Store.mem.overrides[id] = { ...(Store.mem.overrides[id] || {}), memo: $('#memo').value };
+    Store.save(); toast('メモを保存しました');
   };
   $('#exclude').onclick = () => {
-    mem.overrides[id] = { ...(mem.overrides[id] || {}), excluded: !ov.excluded };
-    save(); dlg.close(); renderList(); renderHome();
+    Store.mem.overrides[id] = { ...(Store.mem.overrides[id] || {}), excluded: !ov.excluded };
+    Store.save(); dlg.close(); renderList(); renderHome();
   };
   if (!dlg.open) dlg.showModal();
 }
@@ -417,10 +419,10 @@ function openDetail(id) {
 function renderStats() {
   const now = Date.now();
   const cards = visibleCards();
-  const ps = cards.map((c) => mem.progress[c.id]).filter(Boolean);
+  const ps = cards.map((c) => Store.mem.progress[c.id]).filter(Boolean);
   const dueN = ps.filter((p) => p.due <= now).length;
   const matureN = ps.filter((p) => p.interval >= 21).length;
-  const last30 = mem.reviews.filter((r) => now - r.t < 30 * 86400000);
+  const last30 = Store.mem.reviews.filter((r) => now - r.t < 30 * 86400000);
   const good = last30.filter((r) => r.grade >= 2).length;
   const ret = last30.length ? Math.round((good / last30.length) * 100) : 0;
   $('#stDue').textContent = dueN;
@@ -432,7 +434,7 @@ function renderStats() {
   const vals = [];
   for (let back = 6; back >= 0; back--) {
     const d = new Date(); d.setDate(d.getDate() - back);
-    const v = mem.activity[todayKey(d)] || 0;
+    const v = Store.mem.activity[Store.todayKey(d)] || 0;
     vals.push({ v, today: back === 0, label: `${d.getMonth() + 1}/${d.getDate()}` });
     mx = Math.max(mx, v);
   }
@@ -442,16 +444,16 @@ function renderStats() {
 
 /* ---------- 設定・教材管理 ---------- */
 function renderSettings() {
-  const s = mem.settings;
+  const s = Store.mem.settings;
   $('#setGoal').value = s.dailyGoal; $('#setNew').value = s.newPerDay;
   $('#setMode').value = s.mode; $('#setEx').value = s.exDisplay;
   $('#setTime').value = s.remindTime || '';
   $('#setNotify').checked = !!s.notifyOn;
-  const decks = Object.values(mem.decks);
+  const decks = Object.values(Store.mem.decks);
   $('#deckBox').innerHTML = decks.map((d) => `
     <div class="card"><div class="row"><strong>${esc(d.title)}</strong><span class="grow"></span>
       <span class="pill">${d.enabled ? '有効' : '無効'}</span></div>
-    <div class="muted small">${esc(d.id)} ・ ${d.custom ? '取込教材' : esc(d.file || '')} ・ ${d.count ?? Object.values(mem.cards).filter((c) => c.deckId === d.id).length}語</div>
+    <div class="muted small">${esc(d.id)} ・ ${d.custom ? '取込教材' : esc(d.file || '')} ・ ${d.count ?? Object.values(Store.mem.cards).filter((c) => c.deckId === d.id).length}語</div>
     <div class="row" style="margin-top:8px">
       <button class="small" data-act="toggle" data-id="${esc(d.id)}">${d.enabled ? '無効化' : '有効化'}</button>
       <button class="small" data-act="export" data-id="${esc(d.id)}">書出</button>
@@ -461,20 +463,20 @@ function renderSettings() {
 }
 
 function deckAction(act, id) {
-  const d = mem.decks[id];
+  const d = Store.mem.decks[id];
   if (!d) return;
-  if (act === 'toggle') { d.enabled = !d.enabled; save(); renderSettings(); renderHome(); }
+  if (act === 'toggle') { d.enabled = !d.enabled; Store.save(); renderSettings(); renderHome(); }
   if (act === 'del') {
     if (d.custom) {
-      Object.keys(mem.cards).forEach((k) => { if (mem.cards[k].deckId === id) delete mem.cards[k]; });
-      delete mem.decks[id];
+      Object.keys(Store.mem.cards).forEach((k) => { if (Store.mem.cards[k].deckId === id) delete Store.mem.cards[k]; });
+      delete Store.mem.decks[id];
     } else d.enabled = false;
-    save(); renderSettings(); renderHome(); renderList(); toast('教材を無効化/削除しました');
+    Store.save(); renderSettings(); renderHome(); renderList(); toast('教材を無効化/削除しました');
   }
   if (act === 'export') {
-    const cards = Object.values(mem.cards).filter((c) => c.deckId === id)
+    const cards = Object.values(Store.mem.cards).filter((c) => c.deckId === id)
       .map((c) => ({ ...c, meaning: effMeaning(c) }));
-    const blob = new Blob([cardsToCSV(cards)], { type: 'text/csv;charset=utf-8' });
+    const blob = new Blob([CSV.cardsToCSV(cards)], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `${id}.csv`; a.click();
@@ -486,11 +488,11 @@ async function importFile(file) {
   const text = await file.text();
   if (text.length > 2_000_000) { toast('2MB超のため取込できません(分割してください)'); return; }
   const id = 'custom_' + Date.now().toString(36);
-  const { cards, errors } = rowsToCards(parseCSV(text), id);
+  const { cards, errors } = CSV.rowsToCards(CSV.parseCSV(text), id);
   if (!cards.length) { toast('有効な単語がありません: ' + errors.slice(0, 2).join(' / ')); return; }
-  mem.decks[id] = { id, title: file.name.replace(/\.csv$/i, ''), enabled: true, custom: true, csvText: text, count: cards.length };
-  cards.forEach((c) => (mem.cards[c.id] = c));
-  save(); renderSettings(); renderHome();
+  Store.mem.decks[id] = { id, title: file.name.replace(/\.csv$/i, ''), enabled: true, custom: true, csvText: text, count: cards.length };
+  cards.forEach((c) => (Store.mem.cards[c.id] = c));
+  Store.save(); renderSettings(); renderHome();
   $('#importMsg').innerHTML = `<span class="ok">${esc(cards.length)}語を取り込みました</span>${errors.length ? `<br><span class="muted small">注意: ${esc(errors.slice(0, 3).join(' / '))}${errors.length > 3 ? ` 他${errors.length - 3}件` : ''}</span>` : ''}
     <table class="prev" style="margin-top:8px"><tr><th>英単語</th><th>訳</th><th>例文1</th></tr>${cards.slice(0, 3).map((c) => `<tr><td>${esc(c.word)}</td><td>${esc(effMeaning(c))}</td><td>${esc((c.ex1 || '').slice(0, 30))}</td></tr>`).join('')}</table>`;
 }
@@ -499,7 +501,7 @@ async function importFile(file) {
 let notifyTimer = null;
 function scheduleNotify() {
   clearTimeout(notifyTimer);
-  const s = mem.settings;
+  const s = Store.mem.settings;
   if (!s.notifyOn || !s.remindTime || !('Notification' in window)) return;
   const [h, m] = s.remindTime.split(':').map(Number);
   const next = new Date(); next.setHours(h, m, 0, 0);
@@ -517,22 +519,24 @@ async function boot() {
     try { await navigator.serviceWorker.register('./sw.js'); } catch (e) { console.warn('SW登録失敗', e); }
   }
   await loadBundled();
-  $$('nav.tabs button').forEach((b) => (b.onclick = () => { if (b.dataset.view === 'learn' && !ses) { startSession(); return; } showView(b.dataset.view); }));
+  $$('nav.tabs button').forEach((b) => (b.onclick = () => { if (b.dataset.view === 'learn' && (!ses || ses.i >= ses.q.length)) { startSession(); return; } showView(b.dataset.view); }));
+  $('#btnGoList').onclick = () => showView('list');
+  $('#btnGoDecks').onclick = () => showView('settings');
   $('#q').addEventListener('input', renderList);
   $('#deckFilter').addEventListener('change', renderList);
   $('#stFilter').addEventListener('change', renderList);
   $('#saveSettings').onclick = async () => {
-    mem.settings.dailyGoal = Math.max(1, +$('#setGoal').value || 5);
-    mem.settings.newPerDay = Math.max(1, +$('#setNew').value || 5);
-    mem.settings.mode = $('#setMode').value;
-    mem.settings.exDisplay = $('#setEx').value;
-    mem.settings.remindTime = $('#setTime').value;
-    mem.settings.notifyOn = $('#setNotify').checked;
-    if (mem.settings.notifyOn && 'Notification' in window) {
+    Store.mem.settings.dailyGoal = Math.max(1, +$('#setGoal').value || 5);
+    Store.mem.settings.newPerDay = Math.max(1, +$('#setNew').value || 5);
+    Store.mem.settings.mode = $('#setMode').value;
+    Store.mem.settings.exDisplay = $('#setEx').value;
+    Store.mem.settings.remindTime = $('#setTime').value;
+    Store.mem.settings.notifyOn = $('#setNotify').checked;
+    if (Store.mem.settings.notifyOn && 'Notification' in window) {
       const p = await Notification.requestPermission();
-      if (p !== 'granted') { mem.settings.notifyOn = false; toast('通知が許可されませんでした'); }
+      if (p !== 'granted') { Store.mem.settings.notifyOn = false; toast('通知が許可されませんでした'); }
     }
-    save(); scheduleNotify(); renderHome(); toast('設定を保存しました');
+    Store.save(); scheduleNotify(); renderHome(); toast('設定を保存しました');
   };
   $('#csvFile').addEventListener('change', (e) => { if (e.target.files[0]) importFile(e.target.files[0]); e.target.value = ''; });
   $('#closeDetail').onclick = () => $('#detail').close();
@@ -543,7 +547,7 @@ async function boot() {
   };
   renderHome(); renderStats(); scheduleNotify();
   showView('home');
-  if (!Object.keys(mem.cards).length) {
+  if (!Object.keys(Store.mem.cards).length) {
     toast('CSVが未読込です。設定→教材管理から取り込んでください');
   }
 }

@@ -3,35 +3,35 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#2563eb">
+<meta name="theme-color" content="#4f46e5">
 <meta name="description" content="忘却曲線と習慣化で続けるモバイルファースト英単語学習PWA">
 <title>英単語ドリル</title>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icons/icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="./icons/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="英単語ドリル">
 <link rel="stylesheet" href="./css/style.css">
-<style>#toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);background:#020617;border:1px solid #334155;color:#f1f5f9;padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:.25s;z-index:99;max-width:92vw}#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}</style>
 </head>
 <body>
 <header class="top">
+  <span class="brand">E</span>
   <h1>英単語ドリル<small>忘却曲線 × 習慣化 ・ 2分セッション</small></h1>
-  <button id="installBtn" class="install small" hidden>📲 アプリ化</button>
+  <button id="installBtn" class="install small" hidden>アプリ化</button>
 </header>
 
 <main>
   <!-- ホーム -->
   <section id="view-home" class="view">
-    <div class="card">
+    <div class="card hero">
       <h2>今日やること</h2>
-      <div class="row">
-        <div><div style="font-size:26px;font-weight:800" id="qDue">0</div><div class="muted small">復習(期限)</div></div>
-        <div><div style="font-size:26px;font-weight:800" id="qNew">0</div><div class="muted small">新規</div></div>
-        <div class="grow"></div>
-        <button id="startBtn" class="primary" style="min-width:140px">学習スタート</button>
+      <div class="hero-nums">
+        <div><div class="n" id="qDue">0</div><div class="l">復習(期限)</div></div>
+        <div><div class="n" id="qNew">0</div><div class="l">新規</div></div>
       </div>
+      <div class="row"><button id="startBtn" class="primary grow">学習スタート</button></div>
     </div>
     <div class="card">
       <h2>今日の目標</h2>
@@ -43,8 +43,8 @@
       <h2>ライブラリ</h2>
       <div class="muted small" id="totalTxt"></div>
       <div class="row" style="margin-top:8px">
-        <button class="small ghost" onclick="document.querySelector('nav.tabs button[data-view=list]').click()">単語を探す</button>
-        <button class="small ghost" onclick="document.querySelector('nav.tabs button[data-view=settings]').click()">教材を追加</button>
+        <button class="small ghost" id="btnGoList">単語を探す</button>
+        <button class="small ghost" id="btnGoDecks">教材を追加</button>
       </div>
     </div>
   </section>
@@ -74,10 +74,10 @@
 
   <!-- 統計 -->
   <section id="view-stats" class="view" hidden>
-    <div class="card"><h2>復習待ち</h2><div style="font-size:28px;font-weight:800" id="stDue">0</div>
+    <div class="card"><h2>復習待ち</h2><div class="bignum" id="stDue">0</div>
       <div class="muted small">期限切れはペナルティなし。今日のキューに自動で積まれます。</div></div>
-    <div class="card"><h2>定着(間隔21日以上)</h2><div style="font-size:28px;font-weight:800" id="stMature">0</div></div>
-    <div class="card"><h2>直近30日の正答率</h2><div style="font-size:28px;font-weight:800" id="stRet">—</div>
+    <div class="card"><h2>定着(間隔21日以上)</h2><div class="bignum" id="stMature">0</div></div>
+    <div class="card"><h2>直近30日の正答率</h2><div class="bignum" id="stRet">—</div>
       <div class="muted small">Good/Easy率。登録語数: <span id="stTotal">0</span></div></div>
     <div class="card"><h2>直近7日</h2><div class="bars" id="weekBars"></div><div style="height:22px"></div></div>
   </section>
@@ -87,7 +87,7 @@
     <div class="card">
       <h2>アプリ化</h2>
       <p class="small muted">ホーム画面に入れると全画面・オフラインで使えます。</p>
-      <button id="installBtn2" class="install" hidden>📲 この端末にインストール</button>
+      <button id="installBtn2" class="install" hidden>この端末にインストール</button>
       <p class="small muted">ボタンが出ない場合: iPhoneは共有→「ホーム画面に追加」/ Android Chromeはメニュー→「インストール」。</p>
     </div>
     <div class="card">
@@ -131,16 +131,18 @@
 </main>
 
 <dialog id="detail">
+  <div class="sheet">
   <div class="dlg-head"><strong class="grow">単語詳細</strong><button class="small" id="closeDetail">閉じる</button></div>
   <div class="dlg-body" id="detailBody"></div>
+  </div>
 </dialog>
 
 <nav class="tabs" aria-label="メニュー">
-  <button data-view="home" class="on"><span class="ic">🏠</span>ホーム</button>
-  <button data-view="learn"><span class="ic">📝</span>学習</button>
-  <button data-view="list"><span class="ic">🔍</span>一覧</button>
-  <button data-view="stats"><span class="ic">📊</span>統計</button>
-  <button data-view="settings"><span class="ic">⚙️</span>設定</button>
+  <button data-view="home" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>ホーム</button>
+  <button data-view="learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 9h8M8 13h5"/></svg>学習</button>
+  <button data-view="list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>一覧</button>
+  <button data-view="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>統計</button>
+  <button data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55h.01a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1Z"/></svg>設定</button>
 </nav>
 
 <script src="./js/csv.js"></script>
