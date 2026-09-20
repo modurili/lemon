@@ -125,10 +125,14 @@
         <button type="button" data-v="blank">穴埋め<small>目標語を隠す</small></button>
       </div>
       <label class="f">リマインド時刻</label>
-      <div class="twrap">
-        <div class="wheel" id="whHour" aria-label="時"></div>
-        <span class="wcolon">:</span>
-        <div class="wheel" id="whMin" aria-label="分"></div>
+      <button type="button" class="timeview" id="timeView">07:00</button>
+      <div id="timeEdit" hidden>
+        <div class="twrap">
+          <div class="wheel" id="whHour" aria-label="時"></div>
+          <span class="wcolon">:</span>
+          <div class="wheel" id="whMin" aria-label="分"></div>
+        </div>
+        <div class="row" style="margin-top:8px"><button class="primary grow" id="timeDone">決定</button></div>
       </div>
       <div class="row" style="margin-top:12px"><div class="grow"><div style="font-weight:700">自動読み上げ</div><div class="small muted">出題時は単語のみ・回答後は例文も再生</div></div>
         <button type="button" class="switch" id="swAuto" role="switch" aria-checked="true" aria-label="自動読み上げ"><i></i></button>
@@ -137,11 +141,11 @@
         <button type="button" class="switch" id="swNotify" role="switch" aria-checked="false" aria-label="毎日のリマインド"><i></i></button>
         <span class="helpwrap"><button class="help" type="button" aria-label="ヘルプ">?</button><span class="bubble">サーバを使わないため、通知はこのアプリを開いている間のみ届きます。閉じている間の通知は端末の機能ではできません。</span></span></div>
       <div class="row" style="margin-top:8px"><button class="small" id="testNotify" type="button">通知をテスト</button><span class="small muted" id="notifyState"></span></div>
-      <div class="row" style="margin-top:10px"><button class="primary grow" id="saveSettings">保存</button></div>
+      <p class="small muted" style="margin:10px 0 0">変更は自動で保存されます。</p>
     </div>
     <div class="card">
       <h2>教材管理 <span class="helpwrap"><button class="help" type="button" aria-label="ヘルプ">?</button><span class="bubble">CSVは13列形式(連番,品詞,英単語,訳,その他の訳,例文1,例文1訳,例文1何語目,例文2,例文2訳,例文2何語目,由来語源,備考)です。dataフォルダに置いてmanifest.jsonに登録する方法と、下からの取込の両対応です。</span></span></h2>
-      <label class="file-drop" for="csvFile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0 4 4m-4-4L8 8"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg><span>CSVファイルを選ぶ<small>タップして .csv を選択</small></span></label>
+      <label class="file-drop" for="csvFile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0 4 4m-4-4L8 8"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg><span>CSVファイルをインポート</span></label>
       <input type="file" id="csvFile" class="sr-file" accept=".csv,text/csv" tabindex="-1">
       <div id="importMsg" class="small" style="margin-top:8px"></div>
       <div id="deckBox" style="margin-top:8px"></div>

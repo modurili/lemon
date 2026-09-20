@@ -18,7 +18,7 @@ const IC = {
 };
 
 /* オリジナル選択UI(セグメント) */
-function segInit(id, val) {
+function segInit(id, val, onChange) {
   const el = document.getElementById(id);
   if (!el) return;
   el.dataset.val = val;
@@ -33,6 +33,7 @@ function segInit(id, val) {
         x.classList.toggle('on', o);
         x.setAttribute('aria-checked', o);
       });
+      onChange?.();
     };
   });
 }
@@ -253,7 +254,7 @@ function closeDDs() {
 }
 
 /* オリジナルスイッチ */
-function swInit(id, on) {
+function swInit(id, on, onChange) {
   const el = document.getElementById(id);
   if (!el) return;
   el.dataset.on = on ? '1' : '';
@@ -264,6 +265,7 @@ function swInit(id, on) {
     el.dataset.on = v ? '1' : '';
     el.classList.toggle('on', v);
     el.setAttribute('aria-checked', v);
+    onChange?.();
   };
 }
 function swVal(id) { return document.getElementById(id)?.dataset.on === '1'; }
@@ -484,57 +486,67 @@ function renderCard() {
       <div class="row"><button class="small grow" id="cmSaveMemo">メモ保存</button></div>
       <div class="row"><button class="small ghost grow" id="cmExclude">この単語を除外</button></div>
     </div>`;
-  const exBlock = (which, blank, showJa = true) => {
-    const sent = which === 1 ? c.ex1 : c.ex2;
-    const ja = which === 1 ? c.ex1ja : c.ex2ja;
-    const n = which === 1 ? c.ex1n : c.ex2n;
-    if (!sent) return '';
-    // 訳はタップで開く方式(答えバレ防止+片方だけ訳がない問題の解消)
-    return `<div class="ex"><div>${blank ? blankExample(sent, n) : highlightExample(sent, n)}</div>
-      ${showJa && ja ? `<button class="ja-toggle" data-ja>訳を見る</button><div class="ja" hidden>${esc(ja)}</div>` : ''}
-      <div class="center-row" style="margin-top:8px">${sayBtn(sent, '例文を聞く')}</div></div>`;
+  // 例文2つのうち片方をランダム選択(なければある方、なければnull)
+  const pick = (() => {
+    const opts = [
+      c.ex1 ? { sent: c.ex1, ja: c.ex1ja, n: c.ex1n } : null,
+      c.ex2 ? { sent: c.ex2, ja: c.ex2ja, n: c.ex2n } : null,
+    ].filter(Boolean);
+    if (!opts.length) return null;
+    return opts[Math.floor(Math.random() * opts.length)];
+  })();
+  const pickExBlock = (blank, withJa) => {
+    if (!pick) return '';
+    const body = blank ? blankExample(pick.sent, pick.n) : highlightExample(pick.sent, pick.n);
+    return `<div class="ex"><div${blank ? ' style="font-size:17px"' : ''}>${body}</div>${withJa && pick.ja ? `<div class="ja">${esc(pick.ja)}</div>` : ''}${sayBtn(pick.sent, '例文を聞く', 'top')}</div>`;
   };
+  const altLine = c.alt?.length ? `<div class="muted small" style="text-align:center">ほか: ${esc(c.alt.join(' / '))}</div>` : '';
+  const etymBlock = c.etym ? `<div class="mini-label">由来・語源</div><p class="small muted" style="margin:0 0 4px">${esc(c.etym)}</p>` : '';
+  const noteBlock = c.note ? `<div class="mini-label">備考</div><p class="small muted" style="margin:0">${esc(c.note)}</p>` : '';
   const deckMeta = c.pos ? `<div class="center-row"><span class="pos">${esc(c.pos)}</span></div>` : '';
 
   if (mode === 'recog') {
+    // 答え合わせ前: 品詞・英単語・例文片方 / 後: 訳・他の訳・例文訳・由来・備考
     box.innerHTML = `
       <div class="card">
         ${cardMenu}
-        ${sayBtn(c.word, '発音を聞く', 'edge')}
         ${deckMeta}
-        <div class="word">${esc(c.word)}</div>
-        ${exBlock(1, false, false)}
+        <div class="wordrow"><div class="word">${esc(c.word)}</div>${sayBtn(c.word, '発音を聞く')}</div>
+        ${pickExBlock(false, false)}
         <div id="ans" hidden>
           <div class="meaning">${esc(effMeaning(c))}</div>
-          ${c.alt?.length ? `<div class="muted small" style="text-align:center">ほか: ${esc(c.alt.join(' / '))}</div>` : ''}
-          ${exBlock(2, false)}
-          ${c.etym ? `<button class="small ghost etym-toggle" data-et>語源・由来を見る</button><div class="etym-body small muted" hidden>${esc(c.etym)}</div>` : ''}
+          ${altLine}
+          ${pickExBlock(false, true)}
+          ${etymBlock}
+          ${noteBlock}
         </div>
       </div>`;
-    setBar(`<button class="primary grow" id="reveal">意味を見る</button>`);
+    setBar(`<button class="primary grow wide" id="reveal">意味を見る</button>`);
     autoSpeak([c.word]);
     $('#reveal').onclick = () => {
       $('#ans').hidden = false;
       ses.revealed = true;
       showGrades();
-      autoSpeak([c.word, c.ex1]);
+      autoSpeak([c.word, pick?.sent]);
     };
   } else if (mode === 'recall') {
+    // 前: 品詞・訳・他の訳 / 後: 英単語・例文片方・例文訳・由来・備考
     box.innerHTML = `
       <div class="card">
         ${cardMenu}
         ${deckMeta}
         <div class="meaning">${esc(effMeaning(c))}</div>
-        ${c.alt?.length ? `<div class="muted small" style="text-align:center">ほか: ${esc(c.alt.join(' / '))}</div>` : ''}
+        ${altLine}
         <input type="text" id="tin" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="type the word" enterkeyhint="done" aria-label="英語スペル">
         <div id="ans" hidden>
-          ${sayBtn(c.word, '発音を聞く', 'edge')}
-          <div class="word">${esc(c.word)}</div>
-          ${exBlock(1, false)}${exBlock(2, false)}
+          <div class="wordrow"><div class="word">${esc(c.word)}</div>${sayBtn(c.word, '発音を聞く')}</div>
+          ${pickExBlock(false, true)}
+          ${etymBlock}
+          ${noteBlock}
           <div id="judge" class="small"></div>
         </div>
       </div>`;
-    setBar(`<button class="primary grow" id="check">答え合わせ</button>`);
+    setBar(`<button class="primary grow wide" id="check">答え合わせ</button>`);
     $('#check').onclick = () => {
       const v = $('#tin').value.trim().toLowerCase();
       const ok = v === c.word.toLowerCase();
@@ -543,24 +555,26 @@ function renderCard() {
       $('#judge').innerHTML = ok ? '<span class="ok">正解です</span>' : `<span class="ng">不正解</span> <span class="muted">正: ${esc(c.word)}</span>`;
       flashJudge(ok);
       showGrades();
-      autoSpeak([c.word, c.ex1]);
+      autoSpeak([c.word, pick?.sent]);
     };
   } else {
-    // cloze: 例文穴埋め (ハイライトと穴埋めの両対応: 出題時は伏せ、答え合わせ後はハイライト)
+    // 穴埋め 前: 例文片方(虫食い)・例文訳 / 後: 英単語・訳・他の訳・由来・備考
     box.innerHTML = `
       <div class="card">
         ${cardMenu}
-        <div class="ex"><div style="font-size:17px">${blankExample(c.ex1, c.ex1n)}</div><div class="ja">${esc(c.ex1ja)}</div></div>
+        ${pickExBlock(true, true)}
         <div class="muted" style="text-align:center">${esc(effMeaning(c))} <span class="pos">${esc(c.pos || '')}</span></div>
         <input type="text" id="tin" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="fill the blank" enterkeyhint="done" aria-label="空欄に入る単語">
         <div id="ans" hidden>
-          ${sayBtn(c.word, '発音を聞く', 'edge')}
-          <div class="word">${esc(c.word)}</div>
-          ${exBlock(1, false)}
+          <div class="wordrow"><div class="word">${esc(c.word)}</div>${sayBtn(c.word, '発音を聞く')}</div>
+          <div class="meaning">${esc(effMeaning(c))}</div>
+          ${altLine}
+          ${etymBlock}
+          ${noteBlock}
           <div id="judge" class="small"></div>
         </div>
       </div>`;
-    setBar(`<button class="primary grow" id="check">答え合わせ</button>`);
+    setBar(`<button class="primary grow wide" id="check">答え合わせ</button>`);
     $('#check').onclick = () => {
       const v = $('#tin').value.trim().toLowerCase();
       const ok = v === c.word.toLowerCase();
@@ -569,22 +583,10 @@ function renderCard() {
       $('#judge').innerHTML = ok ? '<span class="ok">正解です</span>' : `<span class="ng">不正解</span> <span class="muted">正: ${esc(c.word)}</span>`;
       flashJudge(ok);
       showGrades();
-      autoSpeak([c.word, c.ex1]);
+      autoSpeak([c.word, pick?.sent]);
     };
   }
   $$('#cardBox [data-say]').forEach((b) => (b.onclick = () => speak(b.dataset.say)));
-  $$('#cardBox [data-ja]').forEach((b) => (b.onclick = () => {
-    const j = b.parentElement.querySelector('.ja');
-    j.hidden = !j.hidden;
-    b.textContent = j.hidden ? '訳を見る' : '訳を閉じる';
-    b.classList.toggle('on', !j.hidden);
-  }));
-  const etb = $('#cardBox [data-et]');
-  if (etb) etb.onclick = () => {
-    const b = $('#cardBox .etym-body');
-    b.hidden = !b.hidden;
-    etb.textContent = b.hidden ? '語源・由来を見る' : '語源・由来を閉じる';
-  };
   const tin = $('#tin');
   if (tin) {
     tin.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('#check')?.click(); } });
@@ -735,9 +737,9 @@ function renderList() {
     const st = SRS.statusOf(p);
     const pill = { new: '未学習', due: '復習期', relearn: '再学習', young: '学習中', mature: '定着' }[st];
     return `<div class="card" data-id="${esc(c.id)}" style="cursor:pointer">
-      <div class="row"><strong>${esc(c.word)}</strong><span class="pos">${esc(c.pos || '')}</span>
-      <span class="pill">${pill}</span><span class="grow"></span><span class="muted small">#${esc(c.seq)}</span></div>
-      <div class="muted">${esc(effMeaning(c))}</div></div>`;
+      <div class="row"><strong>${esc(c.word)}</strong><span class="grow"></span>${c.pos ? `<span class="pos">${esc(c.pos)}</span>` : ''}
+      <span class="pill">${pill}</span></div>
+      <div class="row" style="margin-top:2px"><span class="muted grow">${esc(effMeaning(c))}</span><span class="muted small">#${esc(c.seq)}</span></div></div>`;
   }).join('') || '<p class="muted">該当なし。CSVを取り込むか検索条件を変えてください。</p>';
   $$('#listBox .card').forEach((el) => (el.onclick = () => openDetail(el.dataset.id)));
 }
@@ -754,16 +756,15 @@ function openDetail(id) {
     if (!sent) return '';
     return `<div class="ex" data-ex="${w}"><div>${showBlank ? blankExample(sent, n) : highlightExample(sent, n)}</div>
       <div class="ja">${esc(ja)}</div>
-      <div class="center-row" style="margin-top:8px"><button class="saybtn" data-say="${esc(sent)}" title="例文を聞く" aria-label="例文を聞く">${IC.say}</button>
-      <span class="muted small">${n ? `目標語は${n}語目` : ''}</span></div></div>`;
+      <div class="center-row" style="margin-top:8px"><button class="saybtn" data-say="${esc(sent)}" title="例文を聞く" aria-label="例文を聞く">${IC.say}</button></div></div>`;
   }).join('');
   $('#detailBody').innerHTML = `
     <div class="row"><span class="pos">${esc(c.pos || '')}</span><span class="muted small">${esc(c.deckId)} #${esc(c.seq)}</span></div>
     <div class="word">${esc(c.word)}</div>
     <div class="center-row"><button class="saybtn" id="sayW" title="発音を聞く" aria-label="発音を聞く">${IC.say}</button>
       <span class="pill">${p ? `間隔${p.interval}日・次回${new Date(p.due).toLocaleDateString('ja-JP')}` : '未学習'}</span></div>
-    <label class="f">訳</label><div class="meaning">${esc(effMeaning(c))}</div>
-    ${c.alt?.length ? `<div class="muted small">ほか: ${esc(c.alt.join(' / '))}</div>` : ''}
+    <div class="meaning">${esc(effMeaning(c))}</div>
+    ${c.alt?.length ? `<div class="muted small">${esc(c.alt.join(' / '))}</div>` : ''}
     <div class="row" style="margin:8px 0">
       <button class="small" id="tglEx">表示切替: ${showBlank ? '穴埋め' : 'ハイライト'}</button>
       <span class="helpwrap"><button class="help" type="button" aria-label="ヘルプ">?</button><span class="bubble">出題時は穴埋め・確認時はハイライトが基本です。</span></span>
@@ -775,7 +776,6 @@ function openDetail(id) {
     <textarea id="memo" placeholder="覚え方・注意点など">${esc(ov.memo || '')}</textarea>
     <div class="row" style="margin-top:10px">
       <button class="small grow" id="saveMemo">メモ保存</button>
-      <button class="small" id="exclude">${ov.excluded ? '除外を解除' : 'この単語を除外'}</button>
     </div>`;
   $('#sayW').onclick = () => speak(c.word);
   $$('#detailBody [data-say]').forEach((b) => (b.onclick = () => speak(b.dataset.say)));
@@ -792,10 +792,6 @@ function openDetail(id) {
   $('#saveMemo').onclick = () => {
     Store.mem.overrides[id] = { ...(Store.mem.overrides[id] || {}), memo: $('#memo').value };
     Store.save(); toast('メモを保存しました');
-  };
-  $('#exclude').onclick = () => {
-    Store.mem.overrides[id] = { ...(Store.mem.overrides[id] || {}), excluded: !ov.excluded };
-    Store.save(); dlg.close(); renderList(); renderHome();
   };
   if (!dlg.open) dlg.showModal();
 }
@@ -856,6 +852,19 @@ function renderGrass() {
   $('#grassTotal').textContent = `${total}語`;
   const d0 = new Date(today); d0.setDate(d0.getDate() - (WEEKS * 7 - 1));
   $('#grassRange').textContent = `過去${WEEKS}週(${d0.getMonth() + 1}/${d0.getDate()}〜)の学習量`;
+  fitGrass();
+}
+
+/* 草のマスを横幅いっぱいにフィット */
+function fitGrass() {
+  const scroll = document.querySelector('.calscroll');
+  const wrap = document.querySelector('.calwrap');
+  if (!scroll || !wrap) return;
+  const WEEKS = 17, gap = 3;
+  const avail = scroll.clientWidth;
+  if (!avail) return;
+  const cell = Math.min(20, Math.max(10, Math.floor((avail - (WEEKS - 1) * gap) / WEEKS)));
+  wrap.style.setProperty('--cell', `${cell}px`);
 }
 
 function onGrassTap(e) {
@@ -873,9 +882,10 @@ function onGrassTap(e) {
 function renderSettings() {
   const s = Store.mem.settings;
   $('#setGoal').value = s.dailyGoal; $('#setNew').value = s.newPerDay;
-  segInit('segMode', s.mode); segInit('segEx', s.exDisplay);
-  swInit('swNotify', !!s.notifyOn);
-  swInit('swAuto', s.autoSpeak !== false);
+  segInit('segMode', s.mode, scheduleSettingsSave);
+  segInit('segEx', s.exDisplay, scheduleSettingsSave);
+  swInit('swNotify', !!s.notifyOn, scheduleSettingsSave);
+  swInit('swAuto', s.autoSpeak !== false, scheduleSettingsSave);
   const curAcc = (s.accent || '#5bb88a').toLowerCase();
   $$('#swAcc button').forEach((b) => {
     b.classList.toggle('on', b.dataset.c.toLowerCase() === curAcc);
@@ -886,9 +896,10 @@ function renderSettings() {
       $$('#swAcc button').forEach((x) => x.classList.toggle('on', x === b));
     };
   });
-  const [hh, mm] = (s.remindTime || '07:00').split(':').map(Number);
-  wheelSet('whHour', Number.isFinite(hh) ? hh : 7);
-  wheelSet('whMin', Number.isFinite(mm) ? mm : 0);
+  $('#timeView').textContent = s.remindTime || '07:00';
+  $('#timeEdit').hidden = true;
+  $('#timeView').hidden = false;
+  timeTouched = false;
   updateNotifyState();
   const gone = Object.keys(Store.mem.deckGone || {});
   const decks = Object.values(Store.mem.decks);
@@ -960,6 +971,36 @@ async function importFile(file) {
     <table class="prev" style="margin-top:8px"><tr><th>英単語</th><th>訳</th><th>例文1</th></tr>${cards.slice(0, 3).map((c) => `<tr><td>${esc(c.word)}</td><td>${esc(effMeaning(c))}</td><td>${esc((c.ex1 || '').slice(0, 30))}</td></tr>`).join('')}</table>`;
 }
 
+/* 設定の自動保存(保存ボタンなし) */
+let settingsT = null;
+let timeTouched = false;
+function scheduleSettingsSave() {
+  clearTimeout(settingsT);
+  settingsT = setTimeout(collectSettings, 600);
+}
+async function collectSettings() {
+  Store.mem.settings.dailyGoal = Math.max(1, +$('#setGoal').value || 5);
+  Store.mem.settings.newPerDay = Math.max(1, +$('#setNew').value || 5);
+  Store.mem.settings.mode = segVal('segMode') || 'mix';
+  Store.mem.settings.exDisplay = segVal('segEx') || 'highlight';
+  if (timeTouched) Store.mem.settings.remindTime = wheelTime();
+  Store.mem.settings.notifyOn = swVal('swNotify');
+  Store.mem.settings.autoSpeak = swVal('swAuto');
+  if (Store.mem.settings.notifyOn && 'Notification' in window) {
+    let p = Notification.permission;
+    if (p === 'default') {
+      try { p = await Notification.requestPermission(); } catch { p = Notification.permission; }
+    }
+    if (p !== 'granted') {
+      Store.mem.settings.notifyOn = false;
+      swInit('swNotify', false, scheduleSettingsSave);
+      toast('通知が許可されませんでした');
+    }
+  }
+  Store.save(); scheduleNotify(); renderHome();
+  updateNotifyState();
+}
+
 /* ---------- 通知(習慣化リマインド) ---------- */
 let notifyTimer = null;
 function scheduleNotify() {
@@ -1019,33 +1060,45 @@ async function boot() {
     try { await navigator.serviceWorker.register('./sw.js'); } catch (e) { console.warn('SW登録失敗', e); }
   }
   await loadBundled();
-  $$('nav.tabs button').forEach((b) => (b.onclick = () => { if (b.dataset.view === 'learn' && (!ses || ses.i >= ses.q.length)) { startSession(); return; } showView(b.dataset.view); }));
+  $$('nav.tabs button').forEach((b) => (b.onclick = () => {
+    if (b.dataset.view === 'learn') {
+      if (!ses || ses.i >= ses.q.length) { startSession(); return; }
+      renderCard(); // セッション継続中は再描画してアクションバーを復元
+    }
+    showView(b.dataset.view);
+  }));
   $('#btnGoList').onclick = () => showView('list');
   $('#btnGoDecks').onclick = () => showView('settings');
   $('#q').addEventListener('input', renderList);
   ddSetup('ddDeck'); ddSetup('ddState');
   wheelBuild('whHour', 0, 23); wheelBuild('whMin', 0, 59);
+  // 設定は自動保存(保存ボタンなし)
+  $('#setGoal').addEventListener('input', scheduleSettingsSave);
+  $('#setNew').addEventListener('input', scheduleSettingsSave);
+  ['whHour', 'whMin'].forEach((id) => document.getElementById(id).addEventListener('scroll', scheduleSettingsSave, { passive: true }));
+  $('#timeView').onclick = () => {
+    $('#timeView').hidden = true; $('#timeEdit').hidden = false;
+    timeTouched = true;
+    const [hh, mm] = (Store.mem.settings.remindTime || '07:00').split(':').map(Number);
+    requestAnimationFrame(() => {
+      wheelSet('whHour', Number.isFinite(hh) ? hh : 7);
+      wheelSet('whMin', Number.isFinite(mm) ? mm : 0);
+    });
+  };
+  $('#timeDone').onclick = () => {
+    Store.mem.settings.remindTime = wheelTime(); // 非表示にするとscrollTopが読めなくなるため先に確保
+    timeTouched = false;
+    $('#timeEdit').hidden = true; $('#timeView').hidden = false;
+    clearTimeout(settingsT);
+    collectSettings();
+    renderSettings();
+  };
   $('#sesQuit').onclick = () => { ses = null; try { speechSynthesis.cancel(); } catch { /* noop */ } showView('home'); toast('セッションを終了しました'); };
   $('#sesUndo').onclick = undoLast;
   $('#grass').addEventListener('click', onGrassTap);
+  let rszT = null;
+  window.addEventListener('resize', () => { clearTimeout(rszT); rszT = setTimeout(fitGrass, 200); });
   window.addEventListener('scroll', hidePopover, { passive: true, capture: true });
-  $('#saveSettings').onclick = async () => {
-    Store.mem.settings.dailyGoal = Math.max(1, +$('#setGoal').value || 5);
-    Store.mem.settings.newPerDay = Math.max(1, +$('#setNew').value || 5);
-    Store.mem.settings.mode = segVal('segMode') || 'mix';
-    Store.mem.settings.exDisplay = segVal('segEx') || 'highlight';
-    Store.mem.settings.remindTime = wheelTime();
-    Store.mem.settings.notifyOn = swVal('swNotify');
-    Store.mem.settings.autoSpeak = swVal('swAuto');
-    if (Store.mem.settings.notifyOn && 'Notification' in window) {
-      const p = await Notification.requestPermission();
-      if (p !== 'granted') { Store.mem.settings.notifyOn = false; toast('通知が許可されませんでした'); }
-    }
-    Store.save(); scheduleNotify(); renderHome();
-    swInit('swNotify', Store.mem.settings.notifyOn);
-    updateNotifyState();
-    toast('設定を保存しました');
-  };
   $('#csvFile').addEventListener('change', (e) => { if (e.target.files[0]) importFile(e.target.files[0]); e.target.value = ''; });
   $('#testNotify').onclick = testNotify;
   // はてなヘルプ: タップで開閉(ホバーはCSS)、他所タップで閉じる。端切れ補正つき

@@ -31,6 +31,7 @@
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 [hidden] { display: none !important; }
+html { scrollbar-gutter: stable; }
 html, body { margin: 0; padding: 0; overflow-x: clip; }
 body {
   background: var(--bg); background-image: var(--bg-glow); background-attachment: fixed;
@@ -118,8 +119,11 @@ mark { background: linear-gradient(180deg, transparent 55%, rgba(251, 191, 36, .
 .blank { font-weight: 800; letter-spacing: .14em; color: var(--warn); }
 .ex {
   background: rgba(0, 0, 0, .25); border: 1px solid var(--line);
-  border-radius: 14px; padding: 12px 14px; margin: 10px 0; font-size: 15px;
+  border-radius: 14px; padding: 12px 52px 12px 14px; margin: 10px 0; font-size: 15px;
+  position: relative;
 }
+.ex .saybtn.top { position: absolute; top: 10px; right: 10px; }
+.mini-label { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--muted); margin: 14px 0 4px; }
 .ex .ja { color: var(--muted); font-size: 14px; margin-top: 4px; }
 
 /* フォーム */
@@ -277,7 +281,7 @@ h2 .helpwrap { letter-spacing: 0; }
 /* CSV取込ドロップゾーン */
 .file-drop {
   display: flex; align-items: center; gap: 12px;
-  border: 1.5px dashed rgba(129, 140, 248, .55); border-radius: 16px;
+  border: 1.5px dashed var(--t60); border-radius: 16px;
   padding: 16px; cursor: pointer; background: var(--t07);
   font-weight: 700; font-size: 15px; transition: transform .12s, background .2s;
 }
@@ -383,8 +387,9 @@ h2 .helpwrap { letter-spacing: 0; }
   background: rgba(127, 140, 170, .14); border: 0; color: var(--muted);
 }
 .saybtn svg { width: 17px; height: 17px; }
-.saybtn.edge { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); }
-#cardBox .card { padding-right: 58px; }
+.wordrow { position: relative; }
+#cardBox .wordrow .word { text-align: center; margin: 12px 0 4px; }
+.wordrow .saybtn { position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
 .ja-toggle {
   min-height: 0; padding: 4px 12px; margin-top: 8px; font-size: 12px; font-weight: 600;
   border-radius: 999px; background: rgba(127, 140, 170, .14); border: 0; color: var(--muted);
@@ -446,6 +451,11 @@ h2 .helpwrap { letter-spacing: 0; }
 }
 .wrow.sel { color: var(--ink); font-size: 22px; }
 .wcolon { align-self: center; font-size: 22px; font-weight: 800; color: var(--muted); }
+.timeview {
+  width: 100%; min-height: 56px; font-size: 26px; font-weight: 800;
+  font-variant-numeric: tabular-nums; letter-spacing: .06em;
+  background: rgba(0, 0, 0, .25); border: 1px solid var(--line); border-radius: 14px;
+}
 
 /* 確認モーダル(オリジナル) */
 .veil {
@@ -506,6 +516,7 @@ h2 .helpwrap { letter-spacing: 0; }
 }
 .actionbar .grade { margin-top: 0; }
 .actionbar .grade button { min-height: 52px; }
+.actionbar .wide { display: block; width: 100%; border-radius: 16px; min-height: 58px; font-size: 17px; }
 #cardBox { padding-bottom: 220px; }
 body.on-learn #toast { bottom: calc(var(--tab-h) + 200px); }
 
