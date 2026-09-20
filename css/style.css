@@ -122,7 +122,7 @@ mark { background: linear-gradient(180deg, transparent 55%, rgba(251, 191, 36, .
   border-radius: 14px; padding: 12px 52px 12px 14px; margin: 10px 0; font-size: 15px;
   position: relative;
 }
-.ex .saybtn.top { position: absolute; top: 10px; right: 10px; }
+.ex .saybtn.top { position: absolute; top: 10px; right: 0; }
 .mini-label { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--muted); margin: 14px 0 4px; }
 .ex .ja { color: var(--muted); font-size: 14px; margin-top: 4px; }
 
@@ -369,7 +369,8 @@ h2 .helpwrap { letter-spacing: 0; }
   font-size: 18px; font-weight: 800; letter-spacing: 1px; line-height: 1;
 }
 .cardmenu {
-  position: absolute; top: 46px; right: 10px; z-index: 30; width: 220px;
+  position: absolute; top: 46px; right: 10px; z-index: 30;
+  width: min(392px, calc(100vw - 28px));
   background: var(--card-solid); border: 1px solid var(--line); border-radius: 14px;
   box-shadow: var(--shadow); padding: 8px; animation: rise .18s ease;
 }
@@ -387,9 +388,12 @@ h2 .helpwrap { letter-spacing: 0; }
   background: rgba(127, 140, 170, .14); border: 0; color: var(--muted);
 }
 .saybtn svg { width: 17px; height: 17px; }
-.wordrow { position: relative; }
-#cardBox .wordrow .word { text-align: center; margin: 12px 0 4px; }
-.wordrow .saybtn { position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
+.wordrow { display: flex; align-items: center; gap: 10px; }
+#cardBox .wordrow .word, #detailBody .wordrow .word { flex: 1; text-align: left; margin: 12px 0 4px; }
+#cardBox .wordrow .saybtn, #detailBody .wordrow .saybtn { flex-shrink: 0; }
+#cardBox .meaning { text-align: left; }
+#cardBox .center-row { justify-content: flex-start; }
+.altline { font-size: 12px; color: var(--muted); opacity: .8; margin-top: 2px; }
 .ja-toggle {
   min-height: 0; padding: 4px 12px; margin-top: 8px; font-size: 12px; font-weight: 600;
   border-radius: 999px; background: rgba(127, 140, 170, .14); border: 0; color: var(--muted);

@@ -182,12 +182,10 @@ function setBar(html) {
 function gradeBarHTML() {
   const c = ses.q[ses.i];
   const nowMs = Date.now();
-  const iv = [0, 1, 2, 3].map((g) => fmtDue(SRS.gradeCard(Store.mem.progress[c.id], g, nowMs).due - nowMs));
+  const iv = [0, 2].map((g) => fmtDue(SRS.gradeCard(Store.mem.progress[c.id], g, nowMs).due - nowMs));
   return `<div class="grade" id="grades">
     <button class="g0" data-g="0">忘れた<small>${iv[0]}</small></button>
-    <button data-g="1">あいまい<small>${iv[1]}</small></button>
-    <button data-g="2">わかった<small>${iv[2]}</small></button>
-    <button class="g3" data-g="3">余裕<small>${iv[3]}</small></button>
+    <button class="g3" data-g="2">わかった<small>${iv[1]}</small></button>
   </div>`;
 }
 function showGrades() {
@@ -484,7 +482,6 @@ function renderCard() {
       <label class="f" for="cmMemo">メモ</label>
       <textarea id="cmMemo" placeholder="覚え方など">${esc(Store.mem.overrides[c.id]?.memo || '')}</textarea>
       <div class="row"><button class="small grow" id="cmSaveMemo">メモ保存</button></div>
-      <div class="row"><button class="small ghost grow" id="cmExclude">この単語を除外</button></div>
     </div>`;
   // 例文2つのうち片方をランダム選択(なければある方、なければnull)
   const pick = (() => {
@@ -500,26 +497,26 @@ function renderCard() {
     const body = blank ? blankExample(pick.sent, pick.n) : highlightExample(pick.sent, pick.n);
     return `<div class="ex"><div${blank ? ' style="font-size:17px"' : ''}>${body}</div>${withJa && pick.ja ? `<div class="ja">${esc(pick.ja)}</div>` : ''}${sayBtn(pick.sent, '例文を聞く', 'top')}</div>`;
   };
-  const altLine = c.alt?.length ? `<div class="muted small" style="text-align:center">ほか: ${esc(c.alt.join(' / '))}</div>` : '';
+  const altLine = c.alt?.length ? `<div class="altline">${esc(c.alt.join(' / '))}</div>` : '';
   const etymBlock = c.etym ? `<div class="mini-label">由来・語源</div><p class="small muted" style="margin:0 0 4px">${esc(c.etym)}</p>` : '';
   const noteBlock = c.note ? `<div class="mini-label">備考</div><p class="small muted" style="margin:0">${esc(c.note)}</p>` : '';
   const deckMeta = c.pos ? `<div class="center-row"><span class="pos">${esc(c.pos)}</span></div>` : '';
 
   if (mode === 'recog') {
-    // 答え合わせ前: 品詞・英単語・例文片方 / 後: 訳・他の訳・例文訳・由来・備考
+    // 答え合わせ前: 品詞・英単語・例文片方 / 後: 訳・他の訳・例文訳・由来・備考(英文の重複なし)
     box.innerHTML = `
       <div class="card">
         ${cardMenu}
         ${deckMeta}
         <div class="wordrow"><div class="word">${esc(c.word)}</div>${sayBtn(c.word, '発音を聞く')}</div>
-        ${pickExBlock(false, false)}
         <div id="ans" hidden>
           <div class="meaning">${esc(effMeaning(c))}</div>
           ${altLine}
-          ${pickExBlock(false, true)}
+          ${pick?.ja ? `<div class="ja">${esc(pick.ja)}</div>` : ''}
           ${etymBlock}
           ${noteBlock}
         </div>
+        ${pickExBlock(false, false)}
       </div>`;
     setBar(`<button class="primary grow wide" id="reveal">意味を見る</button>`);
     autoSpeak([c.word]);
@@ -563,7 +560,7 @@ function renderCard() {
       <div class="card">
         ${cardMenu}
         ${pickExBlock(true, true)}
-        <div class="muted" style="text-align:center">${esc(effMeaning(c))} <span class="pos">${esc(c.pos || '')}</span></div>
+        <div class="muted small">${esc(effMeaning(c))} <span class="pos">${esc(c.pos || '')}</span></div>
         <input type="text" id="tin" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="fill the blank" enterkeyhint="done" aria-label="空欄に入る単語">
         <div id="ans" hidden>
           <div class="wordrow"><div class="word">${esc(c.word)}</div>${sayBtn(c.word, '発音を聞く')}</div>
@@ -598,20 +595,6 @@ function renderCard() {
     $('#cmSaveMemo').onclick = () => {
       Store.mem.overrides[c.id] = { ...(Store.mem.overrides[c.id] || {}), memo: $('#cmMemo').value };
       Store.save(); toast('メモを保存しました'); menu.hidden = true;
-    };
-    $('#cmExclude').onclick = async () => {
-      menu.hidden = true;
-      const ok = await askConfirm({
-        title: '単語を除外',
-        body: `「${c.word}」を学習対象から外します。一覧・詳細画面から戻せます。`,
-        okText: '除外する', danger: false,
-      });
-      if (!ok) return;
-      Store.mem.overrides[c.id] = { ...(Store.mem.overrides[c.id] || {}), excluded: true };
-      Store.save();
-      ses.q = ses.q.filter((x) => x.id !== c.id);
-      toast('除外しました');
-      renderCard(); renderHome(); renderStats();
     };
   }
 }
@@ -738,10 +721,11 @@ function renderList() {
     const pill = { new: '未学習', due: '復習期', relearn: '再学習', young: '学習中', mature: '定着' }[st];
     return `<div class="card" data-id="${esc(c.id)}" style="cursor:pointer">
       <div class="row"><strong>${esc(c.word)}</strong><span class="grow"></span>${c.pos ? `<span class="pos">${esc(c.pos)}</span>` : ''}
-      <span class="pill">${pill}</span></div>
+      <span class="pill">${pill}</span><button class="saybtn" data-say="${esc(c.word)}" title="発音を聞く" aria-label="${esc(c.word)}の発音を聞く">${IC.say}</button></div>
       <div class="row" style="margin-top:2px"><span class="muted grow">${esc(effMeaning(c))}</span><span class="muted small">#${esc(c.seq)}</span></div></div>`;
   }).join('') || '<p class="muted">該当なし。CSVを取り込むか検索条件を変えてください。</p>';
   $$('#listBox .card').forEach((el) => (el.onclick = () => openDetail(el.dataset.id)));
+  $$('#listBox [data-say]').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); speak(b.dataset.say); }));
 }
 
 function openDetail(id) {
@@ -756,13 +740,12 @@ function openDetail(id) {
     if (!sent) return '';
     return `<div class="ex" data-ex="${w}"><div>${showBlank ? blankExample(sent, n) : highlightExample(sent, n)}</div>
       <div class="ja">${esc(ja)}</div>
-      <div class="center-row" style="margin-top:8px"><button class="saybtn" data-say="${esc(sent)}" title="例文を聞く" aria-label="例文を聞く">${IC.say}</button></div></div>`;
+      <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="saybtn" data-say="${esc(sent)}" title="例文を聞く" aria-label="例文を聞く">${IC.say}</button></div></div>`;
   }).join('');
   $('#detailBody').innerHTML = `
     <div class="row"><span class="pos">${esc(c.pos || '')}</span><span class="muted small">${esc(c.deckId)} #${esc(c.seq)}</span></div>
-    <div class="word">${esc(c.word)}</div>
-    <div class="center-row"><button class="saybtn" id="sayW" title="発音を聞く" aria-label="発音を聞く">${IC.say}</button>
-      <span class="pill">${p ? `間隔${p.interval}日・次回${new Date(p.due).toLocaleDateString('ja-JP')}` : '未学習'}</span></div>
+    <div class="wordrow"><div class="word">${esc(c.word)}</div><button class="saybtn" id="sayW" title="発音を聞く" aria-label="発音を聞く">${IC.say}</button></div>
+    <div class="row"><span class="pill">${p ? `間隔${p.interval}日・次回${new Date(p.due).toLocaleDateString('ja-JP')}` : '未学習'}</span></div>
     <div class="meaning">${esc(effMeaning(c))}</div>
     ${c.alt?.length ? `<div class="muted small">${esc(c.alt.join(' / '))}</div>` : ''}
     <div class="row" style="margin:8px 0">
