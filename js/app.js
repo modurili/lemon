@@ -503,7 +503,7 @@ function renderCard() {
   const deckMeta = c.pos ? `<div class="center-row"><span class="pos">${esc(c.pos)}</span></div>` : '';
 
   if (mode === 'recog') {
-    // 答え合わせ前: 品詞・英単語・例文片方 / 後: 訳・他の訳・例文訳・由来・備考(英文の重複なし)
+    // 答え合わせ前: 品詞・英単語・例文片方 / 後(上から): 品詞・英単語・訳・他の訳・英語例文・例文訳・由来・備考
     box.innerHTML = `
       <div class="card">
         ${cardMenu}
@@ -512,15 +512,19 @@ function renderCard() {
         <div id="ans" hidden>
           <div class="meaning">${esc(effMeaning(c))}</div>
           ${altLine}
+          <div id="ansEx"></div>
           ${pick?.ja ? `<div class="ja">${esc(pick.ja)}</div>` : ''}
           ${etymBlock}
           ${noteBlock}
         </div>
-        ${pickExBlock(false, false)}
+        <div id="preEx">${pickExBlock(false, false)}</div>
       </div>`;
     setBar(`<button class="primary grow wide" id="reveal">意味を見る</button>`);
     autoSpeak([c.word]);
     $('#reveal').onclick = () => {
+      // 出題時の例文を回答内の所定位置へ移動(重複表示なしで指定順にする)
+      const pe = $('#preEx'), slot = $('#ansEx');
+      if (pe && slot) slot.replaceWith(pe);
       $('#ans').hidden = false;
       ses.revealed = true;
       showGrades();
