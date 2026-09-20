@@ -13,7 +13,7 @@ function defaultSettings() {
     mode: 'mix', // recog | recall | cloze | mix
     exDisplay: 'highlight', // highlight | blank (詳細画面の初期表示)
     remindTime: '', notifyOn: false,
-    accent: '#5bb88a',
+    accent: '#5bb88a', autoSpeak: true,
   };
 }
 

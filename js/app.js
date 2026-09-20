@@ -172,6 +172,57 @@ function fmtDue(ms) {
   return `${(d / 365).toFixed(1)}年後`;
 }
 
+/* アクションバー(下部固定): 出題ボタン→採点ボタンの切替 */
+function setBar(html) {
+  const bar = $('#actionBar');
+  bar.innerHTML = html;
+  bar.hidden = false;
+}
+function gradeBarHTML() {
+  const c = ses.q[ses.i];
+  const nowMs = Date.now();
+  const iv = [0, 1, 2, 3].map((g) => fmtDue(SRS.gradeCard(Store.mem.progress[c.id], g, nowMs).due - nowMs));
+  return `<div class="grade" id="grades">
+    <button class="g0" data-g="0">忘れた<small>${iv[0]}</small></button>
+    <button data-g="1">あいまい<small>${iv[1]}</small></button>
+    <button data-g="2">わかった<small>${iv[2]}</small></button>
+    <button class="g3" data-g="3">余裕<small>${iv[3]}</small></button>
+  </div>`;
+}
+function showGrades() {
+  setBar(gradeBarHTML());
+  $$('#actionBar #grades button').forEach((b) => (b.onclick = () => answer(parseInt(b.dataset.g, 10))));
+}
+
+/* 正誤フラッシュ(○✕オーバーレイ+枠グロー) */
+function flashJudge(ok) {
+  const card = $('#cardBox .card');
+  if (!card) return;
+  card.classList.remove('flash-ok', 'flash-ng');
+  void card.offsetWidth;
+  card.classList.add(ok ? 'flash-ok' : 'flash-ng');
+  const ov = document.createElement('div');
+  ov.className = 'judge-ov ' + (ok ? 'ok' : 'ng');
+  ov.textContent = ok ? '○' : '✕';
+  card.appendChild(ov);
+  setTimeout(() => ov.remove(), 800);
+}
+
+/* 自動読み上げ: 設定ON時のみ。出題側の想起・穴埋めでは呼ばない(回答バレ防止) */
+function autoSpeak(list) {
+  if (!Store.mem.settings.autoSpeak) return;
+  try {
+    if (!('speechSynthesis' in window)) return;
+    speechSynthesis.cancel();
+    list.filter(Boolean).forEach((t) => {
+      const u = new SpeechSynthesisUtterance(t);
+      u.lang = 'en-US';
+      u.rate = 0.92;
+      speechSynthesis.speak(u);
+    });
+  } catch { /* 未対応端末 */ }
+}
+
 /* オリジナルドロップダウン */
 function ddSetup(id) {
   const root = document.getElementById(id);
@@ -410,6 +461,7 @@ function renderCard() {
   if (!ses || ses.i >= ses.q.length) {
     box.innerHTML = `<div class="card"><h2>セッション完了</h2><p>お疲れさまでした。短時間でも毎日続けることが定着につながります。</p><div class="row"><button class="primary grow" id="backHome">ホームへ</button></div></div>`;
     prog.style.width = '100%';
+    $('#actionBar').hidden = true;
     $('#backHome').onclick = () => showView('home');
     renderHome(); renderStats();
     return;
@@ -422,9 +474,6 @@ function renderCard() {
   mp.textContent = modeName(mode);
   mp.className = 'modepill m-' + mode;
   ses.mode = mode; ses.revealed = false; ses.userOk = null;
-  // Anki式: 各ボタンに次回間隔を表示(履歴には影響しない仮計算)
-  const nowMs = Date.now();
-  const ivTxt = [0, 1, 2, 3].map((g) => fmtDue(SRS.gradeCard(Store.mem.progress[c.id], g, nowMs).due - nowMs));
 
   const sayBtn = (t, label, cls = '') => `<button class="saybtn ${cls}" data-say="${esc(t)}" title="${label}" aria-label="${label}">${IC.say}</button>`;
   const cardMenu = `
@@ -451,8 +500,9 @@ function renderCard() {
     box.innerHTML = `
       <div class="card">
         ${cardMenu}
+        ${sayBtn(c.word, '発音を聞く', 'edge')}
         ${deckMeta}
-        <div class="wordwrap"><div class="word">${esc(c.word)}</div>${sayBtn(c.word, '発音を聞く', 'edge')}</div>
+        <div class="word">${esc(c.word)}</div>
         ${exBlock(1, false, false)}
         <div id="ans" hidden>
           <div class="meaning">${esc(effMeaning(c))}</div>
@@ -460,15 +510,15 @@ function renderCard() {
           ${exBlock(2, false)}
           ${c.etym ? `<button class="small ghost etym-toggle" data-et>語源・由来を見る</button><div class="etym-body small muted" hidden>${esc(c.etym)}</div>` : ''}
         </div>
-        <div class="row" style="margin-top:12px"><button class="primary grow" id="reveal">意味を見る</button></div>
-        <div class="grade" id="grades" hidden>
-          <button class="g0" data-g="0">忘れた<small>${ivTxt[0]}</small></button>
-          <button data-g="1">あいまい<small>${ivTxt[1]}</small></button>
-          <button data-g="2">わかった<small>${ivTxt[2]}</small></button>
-          <button class="g3" data-g="3">余裕<small>${ivTxt[3]}</small></button>
-        </div>
       </div>`;
-    $('#reveal').onclick = () => { $('#ans').hidden = false; $('#grades').hidden = false; $('#reveal').hidden = true; ses.revealed = true; setTimeout(() => $('#grades').scrollIntoView({ block: 'center', behavior: 'smooth' }), 60); };
+    setBar(`<button class="primary grow" id="reveal">意味を見る</button>`);
+    autoSpeak([c.word]);
+    $('#reveal').onclick = () => {
+      $('#ans').hidden = false;
+      ses.revealed = true;
+      showGrades();
+      autoSpeak([c.word, c.ex1]);
+    };
   } else if (mode === 'recall') {
     box.innerHTML = `
       <div class="card">
@@ -477,25 +527,23 @@ function renderCard() {
         <div class="meaning">${esc(effMeaning(c))}</div>
         ${c.alt?.length ? `<div class="muted small" style="text-align:center">ほか: ${esc(c.alt.join(' / '))}</div>` : ''}
         <input type="text" id="tin" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="type the word" enterkeyhint="done" aria-label="英語スペル">
-        <div class="row" style="margin-top:10px"><button class="primary grow" id="check">答え合わせ</button></div>
         <div id="ans" hidden>
-          <div class="wordwrap"><div class="word">${esc(c.word)}</div>${sayBtn(c.word, '発音を聞く', 'edge')}</div>
+          ${sayBtn(c.word, '発音を聞く', 'edge')}
+          <div class="word">${esc(c.word)}</div>
           ${exBlock(1, false)}${exBlock(2, false)}
           <div id="judge" class="small"></div>
         </div>
-        <div class="grade" id="grades" hidden>
-          <button class="g0" data-g="0">忘れた<small>${ivTxt[0]}</small></button><button data-g="1">あいまい<small>${ivTxt[1]}</small></button>
-          <button data-g="2">わかった<small>${ivTxt[2]}</small></button><button class="g3" data-g="3">余裕<small>${ivTxt[3]}</small></button>
-        </div>
       </div>`;
+    setBar(`<button class="primary grow" id="check">答え合わせ</button>`);
     $('#check').onclick = () => {
       const v = $('#tin').value.trim().toLowerCase();
       const ok = v === c.word.toLowerCase();
       ses.userOk = ok;
-      $('#ans').hidden = false; $('#grades').hidden = false;
+      $('#ans').hidden = false;
       $('#judge').innerHTML = ok ? '<span class="ok">正解です</span>' : `<span class="ng">不正解</span> <span class="muted">正: ${esc(c.word)}</span>`;
-      $('#check').hidden = true;
-      setTimeout(() => $('#grades').scrollIntoView({ block: 'center', behavior: 'smooth' }), 60);
+      flashJudge(ok);
+      showGrades();
+      autoSpeak([c.word, c.ex1]);
     };
   } else {
     // cloze: 例文穴埋め (ハイライトと穴埋めの両対応: 出題時は伏せ、答え合わせ後はハイライト)
@@ -505,30 +553,26 @@ function renderCard() {
         <div class="ex"><div style="font-size:17px">${blankExample(c.ex1, c.ex1n)}</div><div class="ja">${esc(c.ex1ja)}</div></div>
         <div class="muted" style="text-align:center">${esc(effMeaning(c))} <span class="pos">${esc(c.pos || '')}</span></div>
         <input type="text" id="tin" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="fill the blank" enterkeyhint="done" aria-label="空欄に入る単語">
-        <div class="row" style="margin-top:10px"><button class="primary grow" id="check">答え合わせ</button></div>
         <div id="ans" hidden>
-          <div class="wordwrap"><div class="word">${esc(c.word)}</div>${sayBtn(c.word, '発音を聞く', 'edge')}</div>
-          ${exBlock(1, false)}
+          ${sayBtn(c.word, '発音を聞く', 'edge')}
           <div class="word">${esc(c.word)}</div>
+          ${exBlock(1, false)}
           <div id="judge" class="small"></div>
         </div>
-        <div class="grade" id="grades" hidden>
-          <button class="g0" data-g="0">忘れた<small>${ivTxt[0]}</small></button><button data-g="1">あいまい<small>${ivTxt[1]}</small></button>
-          <button data-g="2">わかった<small>${ivTxt[2]}</small></button><button class="g3" data-g="3">余裕<small>${ivTxt[3]}</small></button>
-        </div>
       </div>`;
+    setBar(`<button class="primary grow" id="check">答え合わせ</button>`);
     $('#check').onclick = () => {
       const v = $('#tin').value.trim().toLowerCase();
       const ok = v === c.word.toLowerCase();
       ses.userOk = ok;
-      $('#ans').hidden = false; $('#grades').hidden = false;
+      $('#ans').hidden = false;
       $('#judge').innerHTML = ok ? '<span class="ok">正解です</span>' : `<span class="ng">不正解</span> <span class="muted">正: ${esc(c.word)}</span>`;
-      $('#check').hidden = true;
-      setTimeout(() => $('#grades').scrollIntoView({ block: 'center', behavior: 'smooth' }), 60);
+      flashJudge(ok);
+      showGrades();
+      autoSpeak([c.word, c.ex1]);
     };
   }
   $$('#cardBox [data-say]').forEach((b) => (b.onclick = () => speak(b.dataset.say)));
-  $$('#grades button').forEach((b) => (b.onclick = () => answer(parseInt(b.dataset.g, 10))));
   $$('#cardBox [data-ja]').forEach((b) => (b.onclick = () => {
     const j = b.parentElement.querySelector('.ja');
     j.hidden = !j.hidden;
@@ -609,6 +653,11 @@ function undoLast() {
 function showView(name) {
   $$('.view').forEach((v) => (v.hidden = v.id !== 'view-' + name));
   $$('nav.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.view === name));
+  document.body.classList.toggle('on-learn', name === 'learn');
+  if (name !== 'learn') {
+    $('#actionBar').hidden = true;
+    try { speechSynthesis.cancel(); } catch { /* noop */ }
+  }
   if (name === 'home') renderHome();
   if (name === 'list') renderList();
   if (name === 'stats') renderStats();
@@ -826,6 +875,7 @@ function renderSettings() {
   $('#setGoal').value = s.dailyGoal; $('#setNew').value = s.newPerDay;
   segInit('segMode', s.mode); segInit('segEx', s.exDisplay);
   swInit('swNotify', !!s.notifyOn);
+  swInit('swAuto', s.autoSpeak !== false);
   const curAcc = (s.accent || '#5bb88a').toLowerCase();
   $$('#swAcc button').forEach((b) => {
     b.classList.toggle('on', b.dataset.c.toLowerCase() === curAcc);
@@ -975,11 +1025,7 @@ async function boot() {
   $('#q').addEventListener('input', renderList);
   ddSetup('ddDeck'); ddSetup('ddState');
   wheelBuild('whHour', 0, 23); wheelBuild('whMin', 0, 59);
-  $$('#wPresets button').forEach((b) => (b.onclick = () => {
-    const [h, m] = b.dataset.t.split(':').map(Number);
-    wheelSet('whHour', h); wheelSet('whMin', m);
-  }));
-  $('#sesQuit').onclick = () => { ses = null; showView('home'); toast('セッションを終了しました'); };
+  $('#sesQuit').onclick = () => { ses = null; try { speechSynthesis.cancel(); } catch { /* noop */ } showView('home'); toast('セッションを終了しました'); };
   $('#sesUndo').onclick = undoLast;
   $('#grass').addEventListener('click', onGrassTap);
   window.addEventListener('scroll', hidePopover, { passive: true, capture: true });
@@ -990,6 +1036,7 @@ async function boot() {
     Store.mem.settings.exDisplay = segVal('segEx') || 'highlight';
     Store.mem.settings.remindTime = wheelTime();
     Store.mem.settings.notifyOn = swVal('swNotify');
+    Store.mem.settings.autoSpeak = swVal('swAuto');
     if (Store.mem.settings.notifyOn && 'Notification' in window) {
       const p = await Notification.requestPermission();
       if (p !== 'granted') { Store.mem.settings.notifyOn = false; toast('通知が許可されませんでした'); }

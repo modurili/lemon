@@ -54,6 +54,7 @@
     <div class="ses-top"><button id="sesQuit" type="button" aria-label="セッションを終了">✕</button><span class="modepill" id="sesMode"></span><span class="grow"></span><span id="sesInfo" class="muted small"></span><button id="sesUndo" type="button" aria-label="直前の採点を取り消す" title="直前の採点を取り消す" disabled>↩</button></div>
     <div class="progress" style="margin:10px 0"><i id="sesProg" style="width:0%"></i></div>
     <div id="cardBox"></div>
+    <div id="actionBar" class="actionbar" hidden></div>
   </section>
 
   <!-- 一覧 -->
@@ -124,16 +125,14 @@
         <button type="button" data-v="blank">穴埋め<small>目標語を隠す</small></button>
       </div>
       <label class="f">リマインド時刻</label>
-      <div class="wpresets" id="wPresets">
-        <button type="button" data-t="07:00">朝 7:00</button>
-        <button type="button" data-t="12:00">昼 12:00</button>
-        <button type="button" data-t="21:00">夜 21:00</button>
-      </div>
       <div class="twrap">
         <div class="wheel" id="whHour" aria-label="時"></div>
         <span class="wcolon">:</span>
         <div class="wheel" id="whMin" aria-label="分"></div>
       </div>
+      <div class="row" style="margin-top:12px"><div class="grow"><div style="font-weight:700">自動読み上げ</div><div class="small muted">出題時は単語のみ・回答後は例文も再生</div></div>
+        <button type="button" class="switch" id="swAuto" role="switch" aria-checked="true" aria-label="自動読み上げ"><i></i></button>
+        <span class="helpwrap"><button class="help" type="button" aria-label="ヘルプ">?</button><span class="bubble">カード表示時に自動で発音します。想起・穴埋めの出題側は無音のままです(回答バレ防止)。初回はブラウザの仕様上「学習スタート」のタップがきっかけになります。</span></span></div>
       <div class="row" style="margin-top:12px"><div class="grow"><div style="font-weight:700">毎日のリマインド</div><div class="small muted">その日にやることがあるときだけ届きます</div></div>
         <button type="button" class="switch" id="swNotify" role="switch" aria-checked="false" aria-label="毎日のリマインド"><i></i></button>
         <span class="helpwrap"><button class="help" type="button" aria-label="ヘルプ">?</button><span class="bubble">サーバを使わないため、通知はこのアプリを開いている間のみ届きます。閉じている間の通知は端末の機能ではできません。</span></span></div>

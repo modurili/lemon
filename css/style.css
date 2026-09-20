@@ -249,6 +249,7 @@ dialog::backdrop { background: rgba(2, 6, 23, .7); backdrop-filter: blur(2px); }
   nav.tabs button.on { color: var(--acc-tx); background: var(--t10); }
   .dlg-head::before { background: #d4d9e6; }
   #toast { background: #141a2e; color: #fff; }
+  .actionbar { background: linear-gradient(transparent, rgba(242, 244, 250, .94) 45%); }
   .progress { background: #e3e7f2; }
 }
 
@@ -382,8 +383,8 @@ h2 .helpwrap { letter-spacing: 0; }
   background: rgba(127, 140, 170, .14); border: 0; color: var(--muted);
 }
 .saybtn svg { width: 17px; height: 17px; }
-.wordwrap { position: relative; }
-.saybtn.edge { position: absolute; right: 0; bottom: 4px; }
+.saybtn.edge { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); }
+#cardBox .card { padding-right: 58px; }
 .ja-toggle {
   min-height: 0; padding: 4px 12px; margin-top: 8px; font-size: 12px; font-weight: 600;
   border-radius: 999px; background: rgba(127, 140, 170, .14); border: 0; color: var(--muted);
@@ -430,11 +431,6 @@ h2 .helpwrap { letter-spacing: 0; }
 .switch.on i { left: 25px; }
 
 /* 時刻ホイール */
-.wpresets { display: flex; gap: 8px; margin-bottom: 10px; }
-.wpresets button {
-  flex: 1; min-height: 42px; border-radius: 12px; font-size: 14px; font-weight: 700;
-  background: var(--t10); border: 1px solid var(--line); color: var(--acc-tx);
-}
 .twrap { display: flex; gap: 10px; align-items: stretch; }
 .wheel {
   flex: 1; height: 132px; overflow-y: auto; scroll-snap-type: y mandatory;
@@ -499,12 +495,49 @@ h2 .helpwrap { letter-spacing: 0; }
   color: #fff; font-size: 20px; font-weight: 800; text-shadow: 0 1px 3px rgba(0, 0, 0, .5);
 }
 .deckops { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+
+/* 下部固定アクションバー(片手操作) */
+.actionbar {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(var(--tab-h) + 8px + env(safe-area-inset-bottom));
+  width: 100%; max-width: 560px; z-index: 15;
+  padding: 18px 16px 4px;
+  background: linear-gradient(transparent, rgba(18, 18, 18, .92) 45%);
+}
+.actionbar .grade { margin-top: 0; }
+.actionbar .grade button { min-height: 52px; }
+#cardBox { padding-bottom: 220px; }
+body.on-learn #toast { bottom: calc(var(--tab-h) + 200px); }
+
+/* 正誤アニメーション */
+.judge-ov {
+  position: absolute; inset: 0; z-index: 5;
+  display: grid; place-items: center;
+  font-size: 110px; font-weight: 800; line-height: 1;
+  pointer-events: none; text-shadow: 0 4px 24px rgba(0, 0, 0, .5);
+  animation: popfade .75s ease forwards;
+}
+.judge-ov.ok { color: var(--ok); }
+.judge-ov.ng { color: var(--bad); }
+@keyframes popfade {
+  0% { opacity: 0; transform: scale(.4); }
+  25% { opacity: 1; transform: scale(1.12); }
+  45% { transform: scale(1); }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.06); }
+}
+.flash-ok { animation: glowok .8s ease; }
+.flash-ng { animation: glong .8s ease; }
+@keyframes glowok { 0%, 100% { box-shadow: var(--shadow); } 30% { box-shadow: 0 0 0 3px var(--ok), var(--shadow); } }
+@keyframes glong { 0%, 100% { box-shadow: var(--shadow); } 30% { box-shadow: 0 0 0 3px var(--bad), var(--shadow); } }
+@media (prefers-reduced-motion: reduce) {
+  .judge-ov, .flash-ok, .flash-ng { animation-duration: .01s; }
+}
 .restore-row { margin-bottom: 4px; }
 
 @media (prefers-color-scheme: light) {
   .dd-btn { background: #fff; }
   .dd-list button.on { color: var(--acc-tx); background: var(--t10); }
-  .wpresets button { background: var(--t14); color: var(--acc-tx); border-color: var(--line); }
   .wheel { background: #fff; }
   .m-recog { background: var(--t16); color: var(--acc-tx); }
   .m-recall { background: #ede9fe; color: #6d28d9; }

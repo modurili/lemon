@@ -1,5 +1,5 @@
 /* lemon Service Worker — GitHub Pages のサブパスでも動くよう相対解決のみ使う */
-const VERSION = 'etan-v8';
+const VERSION = 'etan-v9';
 const CORE = [
   './',
   './index.html',
